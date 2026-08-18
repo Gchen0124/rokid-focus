@@ -1,0 +1,67 @@
+{
+  "tasks": [
+    {
+      "id": "1786973510012",
+      "title": "opps hunting dl",
+      "usd": 300000.0,
+      "minutes": 225,
+      "done": false,
+      "doneAt": "",
+      "archived": false
+    },
+    {
+      "id": "1786973396214",
+      "title": "talent",
+      "usd": 20000.0,
+      "minutes": 60,
+      "done": false,
+      "doneAt": "",
+      "archived": false
+    },
+    {
+      "id": "1786973348366",
+      "title": "BP",
+      "usd": 10000.0,
+      "minutes": 60,
+      "done": false,
+      "doneAt": "",
+      "archived": false
+    },
+    {
+      "id": "1786974267384",
+      "title": "ai glasses productivity",
+      "usd": 1000.0,
+      "minutes": 30,
+      "done": true,
+      "doneAt": "2026-08-17T16:00:19.802Z",
+      "archived": false
+    },
+    {
+      "id": "1786982506203",
+      "title": "trading research dl",
+      "usd": 300.0,
+      "minutes": 30,
+      "done": false,
+      "doneAt": "",
+      "archived": false
+    },
+    {
+      "id": "1786973365032",
+      "title": "营销视频今日 + post x",
+      "usd": 100.0,
+      "minutes": 30,
+      "done": false,
+      "doneAt": "",
+      "archived": false
+    },
+    {
+      "id": "1786974594366",
+      "title": "bunny foods 【eod】",
+      "usd": 0.0,
+      "minutes": 30,
+      "done": true,
+      "doneAt": "2026-08-17T16:00:14.104Z",
+      "archived": false
+    }
+  ]
+}

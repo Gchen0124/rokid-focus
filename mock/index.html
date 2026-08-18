@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Rokid Focus — laptop mock</title>
+  <style>
+    :root {
+      --g: #39ff8e;
+      --mid: #8cffc4;
+      --dim: #3d7a58;
+      --ink: #141414;
+      --paper: #efeae1;
+      --hour: #5ad7ff;
+      --week: #ff6bcb;
+      --wom: #ffc14d;
+      --year: #7cff6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #1c1c1c;
+      color: #eee;
+      display: flex;
+      min-height: 100vh;
+    }
+    .stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 20px;
+    }
+    .label { color: #999; font-size: 12px; }
+    .panel {
+      width: 480px;
+      height: 640px;
+      background: #050505;
+      color: var(--g);
+      padding: 8px 8px 6px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 0 8px #0b0b0b, 0 24px 60px rgba(0,0,0,.55);
+      overflow: hidden;
+    }
+    .top {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .clock-block { flex: 1; min-width: 0; padding-top: 2px; }
+    .stamp {
+      font: 500 11px/1.25 ui-monospace, Menlo, monospace;
+      color: #9fd9b3;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .clock {
+      font: 700 26px/1 ui-monospace, Menlo, monospace;
+      letter-spacing: -0.04em;
+    }
+    .cd {
+      display: inline;
+      margin-left: 8px;
+      font: 600 18px/1 ui-monospace, Menlo, monospace;
+      color: var(--mid);
+    }
+    .cd.check { color: #fff; }
+    .rings { flex: 0 0 176px; height: 176px; overflow: visible; }
+    .slogan {
+      font: 700 15px/1.2 "PingFang SC", "SF Pro Text", sans-serif;
+      color: #fff;
+      letter-spacing: 0.12em;
+      padding: 6px 0 2px;
+    }
+    .list { margin-top: 4px; flex: 1; overflow: hidden; }
+    .row {
+      display: grid;
+      grid-template-columns: 52px 40px 1fr auto;
+      gap: 4px;
+      align-items: baseline;
+      padding: 3px 0;
+      line-height: 1.15;
+    }
+    .row .usd { font-weight: 700; font-family: ui-monospace, Menlo, monospace; color: #ffe08a; }
+    .row .mins { font-weight: 500; font-family: ui-monospace, Menlo, monospace; color: #9ad4ff; }
+    .row .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .etf { font: 600 11px/1 ui-monospace, Menlo, monospace; color: #c8f5d8; white-space: nowrap; }
+    .empty { color: var(--mid); font-size: 16px; margin-top: 12px; }
+    .cap {
+      font: 500 13px/1.35 ui-monospace, Menlo, monospace;
+      color: #c8f5d8;
+      padding: 6px 0 4px;
+      border-top: 1px solid #163322;
+      white-space: pre-line;
+    }
+    .cap.over { color: #ffb4b4; }
+    .foot {
+      display: flex;
+      font-size: 11px;
+      color: var(--dim);
+    }
+    .foot span:last-child { margin-left: auto; }
+    .desk {
+      width: 460px;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 20px;
+      overflow: auto;
+    }
+    .desk h1 { font-size: 20px; margin: 0 0 6px; }
+    .desk p, .desk li { font-size: 13px; line-height: 1.45; color: #333; }
+    .desk h2 { font-size: 13px; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+    input, button {
+      font: inherit;
+      padding: 7px 8px;
+      border-radius: 6px;
+      border: 1px solid #c9c2b6;
+    }
+    .add-grid {
+      display: grid;
+      grid-template-columns: 1fr 120px 90px;
+      gap: 6px;
+    }
+    .add { grid-column: 1 / -1; background: #1b7f4e; color: #fff; border: 0; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0 8px;
+    }
+    .stat {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: 600 12px/1.35 ui-monospace, Menlo, monospace;
+    }
+    .stat b { display: block; font-size: 10px; letter-spacing: .06em; color: #777; margin-bottom: 4px; }
+    .hit {
+      background: #1b7f4e;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: 600 13px/1.35 ui-monospace, Menlo, monospace;
+      min-height: 40px;
+    }
+    .hit.idle { background: #fff; color: #666; font-weight: 500; }
+    .item {
+      background: #fff;
+      padding: 8px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .item.closed { background: #f3f0ea; }
+    .item .line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .item .name { flex: 1 1 100%; min-width: 0; }
+    .item .usd, .item .mins { width: 110px; }
+    .item .when { font: 500 12px/1 ui-monospace, Menlo, monospace; color: #666; }
+    .item .go { margin-left: auto; background: #1b7f4e; color: #fff; border: 0; font-weight: 700; }
+    .ghost { background: #e6e1d8; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; }
+    .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .note { background: #fff; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="label">Color demo · 480×640 · glasses will later map these rings to green fills</div>
+    <div class="panel" id="panel">
+      <div class="top">
+        <div class="clock-block">
+          <div class="stamp" id="stamp">—</div>
+          <div class="clock"><span id="clock">--:--</span><span class="cd" id="cd">--:--</span></div>
+        </div>
+        <svg class="rings" id="rings" viewBox="-8 -8 192 192"></svg>
+      </div>
+      <div class="slogan" id="slogan">怪奇实验室</div>
+      <div class="list" id="list"></div>
+      <div class="cap" id="cap"></div>
+      <div class="foot"><span>click empty = dim</span><span>back=exit</span></div>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="background:#5ad7ff"></i>inner hod</span>
+      <span><i class="sw" style="background:#ff6bcb"></i>dow</span>
+      <span><i class="sw" style="background:#ffc14d"></i>wom</span>
+      <span><i class="sw" style="background:#7cff6b"></i>outer moy</span>
+    </div>
+  </div>
+  <aside class="desk">
+    <h1>Command center</h1>
+    <p>Hit <b>Done</b> when you execute a task. It is saved with the time. Glasses only show what is still open.</p>
+    <div class="stats" id="stats"></div>
+    <div class="hit idle" id="hit">No hits yet today.</div>
+
+    <h2>Add</h2>
+    <div class="add-grid">
+      <input id="title" placeholder="Task name" />
+      <input id="usd" type="text" inputmode="decimal" placeholder="USD" value="1000" />
+      <input id="mins" type="text" inputmode="numeric" placeholder="min" value="30" />
+      <button class="add" id="add">Add</button>
+    </div>
+
+    <h2>Open</h2>
+    <div id="items"></div>
+
+    <h2>Done today</h2>
+    <div id="doneToday"></div>
+
+    <h2>Archive</h2>
+    <div id="archive"></div>
+
+    <h2>Rings</h2>
+    <div class="note" id="ringNote"></div>
+  </aside>
+  <script>
+    const CUTOFF_H = 17;
+    const CUTOFF_M = 30;
+    const DIMS = [0.28, 0.55, 1];
+    let dim = 2;
+    let tasks = [];
+    let lastHit = null;
+    let mutating = false;
+
+    function money(n) {
+      const v = Number(n) || 0;
+      return v >= 1000 ? "$" + Math.round(v / 1000) + "k" : "$" + Math.round(v);
+    }
+    function fmtMins(m) {
+      m = Math.max(0, Math.round(m));
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      if (h && mm) return h + "h" + String(mm).padStart(2, "0");
+      if (h) return h + "h";
+      return mm + "m";
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function ranked() {
+      return [...tasks].sort((a, b) => (b.usd - a.usd) || a.title.localeCompare(b.title));
+    }
+    function isOpen(t) { return !t.done && !t.archived; }
+    function openTasks() { return ranked().filter(isOpen); }
+    function sameDay(iso, now) {
+      if (!iso) return false;
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return false;
+      return d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate();
+    }
+    function doneToday(now) {
+      return tasks
+        .filter(t => t.done && !t.archived && sameDay(t.doneAt, now))
+        .sort((a, b) => String(b.doneAt).localeCompare(String(a.doneAt)));
+    }
+    function archivedTasks(now) {
+      return tasks
+        .filter(t => t.archived || (t.done && !sameDay(t.doneAt, now)))
+        .sort((a, b) => String(b.doneAt).localeCompare(String(a.doneAt)));
+    }
+    function clockShort(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "—";
+      let h = d.getHours();
+      const ap = h >= 12 ? "PM" : "AM";
+      h = h % 12;
+      if (h === 0) h = 12;
+      return h + ":" + String(d.getMinutes()).padStart(2, "0") + " " + ap;
+    }
+    function stampShort(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "";
+      return (d.getMonth() + 1) + "/" + d.getDate() + " " + clockShort(iso);
+    }
+    function valueScale(usd, maxUsd) {
+      if (maxUsd <= 0) return 0;
+      return Math.max(0, Math.min(1, Math.log((Number(usd) || 0) + 1) / Math.log(maxUsd + 1)));
+    }
+    function rowSize(usd, maxUsd) {
+      return Math.round(11 + valueScale(usd, maxUsd) * 11);
+    }
+    function normalize(t) {
+      const usd = Number(t.usd != null ? t.usd : t.value) || 0;
+      const minutes = Number(t.minutes != null ? t.minutes : 30) || 0;
+      const done = Boolean(t.done);
+      const archived = Boolean(t.archived);
+      return {
+        id: String(t.id || Date.now()),
+        title: String(t.title || "").trim(),
+        usd,
+        minutes,
+        done,
+        doneAt: done || archived ? String(t.doneAt || "") : "",
+        archived,
+      };
+    }
+    function countdown(now) {
+      const next = new Date(now);
+      next.setSeconds(0, 0);
+      const rem = now.getMinutes() % 5;
+      if (rem === 0 && now.getSeconds() === 0) next.setMinutes(next.getMinutes() + 5);
+      else next.setMinutes(next.getMinutes() + (5 - rem));
+      const sec = Math.max(0, Math.floor((next - now) / 1000));
+      return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+    }
+    function layers(now) {
+      const h = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+      const day = now.getDay(); // 0 Sun
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const week = Math.floor((now.getDate() + first.getDay() - 1) / 7) + 1;
+      const weeks = Math.floor((daysInMonth + first.getDay() - 1) / 7) + 1;
+      const month = now.getMonth() + 1;
+      return [
+        { abbr: "hod", name: "hour of day", color: "#5ad7ff", frac: h / 24, label: Math.floor(h) + "/24" },
+        { abbr: "dow", name: "day of week", color: "#ff6bcb", frac: (day + h / 24) / 7, label: (day + 1) + "/7" },
+        { abbr: "wom", name: "week of month", color: "#ffc14d", frac: week / weeks, label: week + "/" + weeks },
+        { abbr: "moy", name: "month of year", color: "#7cff6b", frac: (month - 1 + now.getDate() / daysInMonth) / 12, label: month + "/12" },
+      ];
+    }
+    function polar(cx, cy, r, deg) {
+      const a = (deg * Math.PI) / 180;
+      return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    }
+    function drawRings(now) {
+      const svg = document.getElementById("rings");
+      const cx = 84, cy = 84;
+      const radii = [22, 38, 54, 70];
+      const ls = layers(now);
+      let html = "";
+      ls.forEach((L, i) => {
+        const r = radii[i];
+        const c = 2 * Math.PI * r;
+        const frac = Math.max(0.02, Math.min(0.98, L.frac));
+        const dash = frac * c;
+        html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1a1a1a" stroke-width="8"/>`;
+        html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${L.color}" stroke-width="8"
+          stroke-linecap="butt" stroke-dasharray="${dash} ${c}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        const [sx, sy] = polar(cx, cy, r, -98);
+        html += `<text x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" fill="${L.color}" font-size="8" font-weight="700"
+          text-anchor="end" dominant-baseline="middle" font-family="ui-monospace,Menlo,monospace">${L.abbr}</text>`;
+        const [ex, ey] = polar(cx, cy, r + 16, -90 + frac * 360);
+        html += `<text x="${ex.toFixed(1)}" y="${ey.toFixed(1)}" fill="${L.color}" font-size="8" font-weight="700"
+          text-anchor="middle" dominant-baseline="middle" font-family="ui-monospace,Menlo,monospace">${Math.round(L.frac * 100)}%</text>`;
+      });
+      svg.innerHTML = html;
+      document.getElementById("ringNote").innerHTML = ls.map(L =>
+        `<div><i class="sw" style="background:${L.color}"></i>${L.abbr} ${L.name}: <b>${L.label}</b> (${Math.round(L.frac * 100)}%)</div>`
+      ).join("");
+    }
+    function cutoffAt(now) {
+      const c = new Date(now);
+      c.setHours(CUTOFF_H, CUTOFF_M, 0, 0);
+      return c;
+    }
+    function etfOf(now, minutesFromNow) {
+      return clock12(new Date(now.getTime() + Math.max(0, minutesFromNow) * 60000));
+    }
+    function rowEtfs(now, rows) {
+      let acc = 0;
+      return rows.map(t => {
+        acc += Number(t.minutes) || 0;
+        return etfOf(now, acc);
+      });
+    }
+    function capacity(now) {
+      const need = openTasks().reduce((s, t) => s + (Number(t.minutes) || 0), 0);
+      const cut = cutoffAt(now);
+      const toCut = Math.floor((cut - now) / 60000);
+      const finish = new Date(now.getTime() + need * 60000);
+      const etf = clock12(finish);
+      if (need === 0) {
+        return { text: "no work queued", over: false };
+      }
+      if (toCut <= 0) {
+        return { text: "past 5:30 · " + fmtMins(need) + " still open  ·  ETF " + etf, over: true };
+      }
+      if (need <= toCut) {
+        return {
+          text: "need " + fmtMins(need) + "  ·  ETF " + etf + "  ·  " + fmtMins(toCut - need) + " free before 5:30",
+          over: false,
+        };
+      }
+      return {
+        text: "need " + fmtMins(need) + "  ·  ETF " + etf + "  ·  over 5:30 by " + fmtMins(need - toCut),
+        over: true,
+      };
+    }
+    function ordinal(n) {
+      const v = n % 100;
+      if (v >= 11 && v <= 13) return n + "th";
+      return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
+    }
+    function isoWeek(d) {
+      const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const day = t.getUTCDay() || 7;
+      t.setUTCDate(t.getUTCDate() + 4 - day);
+      const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+      return Math.ceil((((t - y0) / 86400000) + 1) / 7);
+    }
+    function stamp(now) {
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const months = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"];
+      const q = Math.floor(now.getMonth() / 3) + 1;
+      return days[now.getDay()] + ", " + months[now.getMonth()] + " " +
+        ordinal(now.getDate()) + ", W" + isoWeek(now) + ", Q" + q + ", " + now.getFullYear();
+    }
+    function clock12(now) {
+      let h = now.getHours();
+      const ap = h >= 12 ? "PM" : "AM";
+      h = h % 12;
+      if (h === 0) h = 12;
+      return h + ":" + String(now.getMinutes()).padStart(2, "0") + " " + ap;
+    }
+    function render(desk) {
+      const now = new Date();
+      document.getElementById("stamp").textContent = stamp(now);
+      document.getElementById("clock").textContent = clock12(now);
+      const cd = document.getElementById("cd");
+      const onFive = now.getMinutes() % 5 === 0 && now.getSeconds() < 12;
+      cd.textContent = onFive ? "CHECK" : countdown(now);
+      cd.classList.toggle("check", onFive);
+      drawRings(now);
+
+      const rows = openTasks().slice(0, 11);
+      const finished = tasks.filter(t => t.done || t.archived).length;
+      const list = document.getElementById("list");
+      if (!rows.length) {
+        list.innerHTML = finished
+          ? '<div class="empty">cleared · ' + finished + ' done</div>'
+          : '<div class="empty">Empty list</div>';
+      } else {
+        const maxUsd = Math.max(0, ...rows.map(t => Number(t.usd) || 0));
+        const etfs = rowEtfs(now, rows);
+        list.innerHTML = rows.map((t, i) => {
+          const sz = rowSize(t.usd, maxUsd);
+          const meta = Math.max(10, Math.round(sz * 0.82));
+          const weight = valueScale(t.usd, maxUsd) > 0.85 ? 700 : 500;
+          return `<div class="row" style="font-size:${sz}px;padding:${Math.round(sz * 0.16)}px 0">
+             <div class="usd" style="font-size:${sz}px">${money(t.usd)}</div>
+             <div class="mins" style="font-size:${meta}px">${fmtMins(t.minutes)}</div>
+             <div class="t" style="font-weight:${weight}">${escapeHtml(t.title)}</div>
+             <div class="etf" style="font-size:${meta}px">${etfs[i]}</div>
+           </div>`;
+        }).join("");
+      }
+      const cap = capacity(now);
+      const capEl = document.getElementById("cap");
+      capEl.textContent = cap.text;
+      capEl.classList.toggle("over", cap.over);
+      document.getElementById("panel").style.filter = `brightness(${DIMS[dim]})`;
+      const foot = document.querySelector(".foot span:last-child");
+      if (foot) foot.textContent = finished ? finished + " done · back=exit" : "back=exit";
+
+      const open = openTasks();
+      const today = doneToday(now);
+      const older = archivedTasks(now);
+      const openUsd = open.reduce((s, t) => s + (Number(t.usd) || 0), 0);
+      const openMin = open.reduce((s, t) => s + (Number(t.minutes) || 0), 0);
+      const todayUsd = today.reduce((s, t) => s + (Number(t.usd) || 0), 0);
+      const todayMin = today.reduce((s, t) => s + (Number(t.minutes) || 0), 0);
+      document.getElementById("stats").innerHTML =
+        `<div class="stat"><b>OPEN</b>${open.length} · ${money(openUsd)} · ${fmtMins(openMin)}</div>` +
+        `<div class="stat"><b>DONE TODAY</b>${today.length} · ${money(todayUsd)} · ${fmtMins(todayMin)}</div>`;
+      const hit = document.getElementById("hit");
+      if (lastHit) {
+        hit.className = "hit";
+        hit.textContent = clockShort(lastHit.at) + " · DONE · " + lastHit.title + " · " + money(lastHit.usd);
+      } else if (today[0]) {
+        hit.className = "hit";
+        hit.textContent = clockShort(today[0].doneAt) + " · DONE · " + today[0].title + " · " + money(today[0].usd);
+      } else {
+        hit.className = "hit idle";
+        hit.textContent = "No hits yet today.";
+      }
+
+      if (desk === false) return;
+      const box = document.getElementById("items");
+      box.innerHTML = open.map(t =>
+        `<div class="item" data-id="${t.id}">
+           <div class="line">
+             <input class="name" value="${escapeHtml(t.title)}" />
+             <input class="usd" type="text" inputmode="decimal" value="${t.usd}" />
+             <input class="mins" type="text" inputmode="numeric" value="${t.minutes}" />
+             <button type="button" class="go done">Done</button>
+             <button type="button" class="ghost del">Delete</button>
+           </div>
+         </div>`
+      ).join("") || "<p>Nothing open.</p>";
+      box.querySelectorAll(".item").forEach(el => bindOpenItem(el));
+
+      const doneBox = document.getElementById("doneToday");
+      doneBox.innerHTML = today.map(t =>
+        `<div class="item closed" data-id="${t.id}">
+           <div class="line">
+             <span class="name">${escapeHtml(t.title)}</span>
+             <span class="usd">${money(t.usd)}</span>
+             <span class="mins">${fmtMins(t.minutes)}</span>
+             <span class="when">${clockShort(t.doneAt)}</span>
+             <button type="button" class="ghost restore">Restore</button>
+             <button type="button" class="ghost archive">Archive</button>
+           </div>
+         </div>`
+      ).join("") || "<p>Nothing done yet.</p>";
+      doneBox.querySelectorAll(".item").forEach(el => bindClosedItem(el));
+
+      const archBox = document.getElementById("archive");
+      archBox.innerHTML = older.map(t =>
+        `<div class="item closed" data-id="${t.id}">
+           <div class="line">
+             <span class="name">${escapeHtml(t.title)}</span>
+             <span class="usd">${money(t.usd)}</span>
+             <span class="when">${stampShort(t.doneAt)}</span>
+             <button type="button" class="ghost restore">Restore</button>
+             <button type="button" class="ghost del">Delete</button>
+           </div>
+         </div>`
+      ).join("") || "<p>Archive empty.</p>";
+      archBox.querySelectorAll(".item").forEach(el => bindClosedItem(el));
+    }
+
+    function bindOpenItem(el) {
+      const id = el.dataset.id;
+      const commit = () => {
+        const t = tasks.find(x => x.id === id);
+        if (!t) return;
+        t.title = el.querySelector(".name").value.trim() || t.title;
+        t.usd = Number(el.querySelector(".usd").value) || 0;
+        t.minutes = Number(el.querySelector(".mins").value) || 0;
+        render();
+        push();
+      };
+      el.querySelector(".name").addEventListener("blur", commit);
+      el.querySelector(".usd").addEventListener("blur", commit);
+      el.querySelector(".mins").addEventListener("blur", commit);
+      el.querySelector(".done").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        markDone(id);
+      });
+      el.querySelector(".del").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        tasks = tasks.filter(x => x.id !== id);
+        render();
+        push();
+      });
+    }
+
+    function bindClosedItem(el) {
+      const id = el.dataset.id;
+      const restoreBtn = el.querySelector(".restore");
+      const archiveBtn = el.querySelector(".archive");
+      const delBtn = el.querySelector(".del");
+      if (restoreBtn) restoreBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        restoreTask(id);
+      });
+      if (archiveBtn) archiveBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        archiveTask(id);
+      });
+      if (delBtn) delBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        tasks = tasks.filter(x => x.id !== id);
+        render();
+        push();
+      });
+    }
+
+    function markDone(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.done = true;
+      t.archived = false;
+      t.doneAt = new Date().toISOString();
+      lastHit = { at: t.doneAt, title: t.title, usd: t.usd };
+      render();
+      push();
+    }
+    function restoreTask(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.done = false;
+      t.archived = false;
+      t.doneAt = "";
+      render();
+      push();
+    }
+    function archiveTask(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.done = true;
+      t.archived = true;
+      if (!t.doneAt) t.doneAt = new Date().toISOString();
+      render();
+      push();
+    }
+
+    document.getElementById("add").onclick = () => {
+      const title = document.getElementById("title").value.trim();
+      if (!title) return;
+      tasks.push(normalize({
+        id: String(Date.now()),
+        title,
+        usd: document.getElementById("usd").value,
+        minutes: document.getElementById("mins").value,
+      }));
+      document.getElementById("title").value = "";
+      render();
+      push();
+    };
+    document.getElementById("panel").addEventListener("click", (e) => {
+      if (e.target.closest(".list") || e.target.closest(".top")) return;
+      dim = (dim + 1) % 3;
+      render();
+    });
+
+    async function pull() {
+      if (mutating) return;
+      try {
+        const res = await fetch("/tasks");
+        const data = await res.json();
+        if (Array.isArray(data.tasks)) tasks = data.tasks.map(normalize);
+      } catch (e) {}
+    }
+    async function push() {
+      mutating = true;
+      try {
+        await fetch("/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tasks }),
+        });
+      } catch (e) {}
+      mutating = false;
+    }
+
+    function editing() {
+      return Boolean(document.activeElement && document.activeElement.closest(".item, .add-grid"));
+    }
+    pull().then(() => render(true));
+    setInterval(() => { if (!editing()) render(false); }, 1000);
+    setInterval(() => { if (!editing()) pull().then(() => render(true)); }, 2500);
+  </script>
+</body>
+</html>
