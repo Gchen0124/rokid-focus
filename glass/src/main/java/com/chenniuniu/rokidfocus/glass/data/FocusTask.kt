@@ -16,6 +16,7 @@ data class FocusTask(
     val assignee: String = "me",
     val handoff: String = "",
     val agentStatus: String = "idle",
+    val outcome: String = "",
 ) {
     val isOpen: Boolean get() = !done && !archived
     val leveragePerHour: Double
@@ -69,6 +70,7 @@ data class FocusTask(
                         .put("assignee", task.assignee)
                         .put("handoff", task.handoff)
                         .put("agentStatus", task.agentStatus)
+                        .put("outcome", task.outcome)
                 )
             }
             return arr.toString()
@@ -103,6 +105,7 @@ data class FocusTask(
                                 assignee = o.optString("assignee", "me").ifBlank { "me" },
                                 handoff = o.optString("handoff", ""),
                                 agentStatus = o.optString("agentStatus", "idle").ifBlank { "idle" },
+                                outcome = o.optString("outcome", ""),
                             )
                         )
                     }

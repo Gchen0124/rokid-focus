@@ -88,6 +88,15 @@
     .row .mins { font-weight: 500; font-family: ui-monospace, Menlo, monospace; color: #9ad4ff; }
     .row .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .row .etf { font: 600 11px/1 ui-monospace, Menlo, monospace; color: #c8f5d8; white-space: nowrap; }
+    .row.result { grid-template-columns: 1fr; }
+    .row .out {
+      color: #fff;
+      font-weight: 700;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .empty { color: var(--mid); font-size: 16px; margin-top: 12px; }
     .cap {
       font: 500 13px/1.35 ui-monospace, Menlo, monospace;
@@ -313,6 +322,7 @@
         assignee,
         handoff: String(t.handoff || ""),
         agentStatus: assignee === "agent" ? status : "idle",
+        outcome: String(t.outcome || ""),
       };
     }
     function countdown(now) {
@@ -454,10 +464,16 @@
       } else {
         const maxUsd = Math.max(0, ...rows.map(t => Number(t.usd) || 0));
         const etfs = rowEtfs(now, rows);
+        const showResult = now.getSeconds() % 9 >= 6;
         list.innerHTML = rows.map((t, i) => {
           const sz = rowSize(t.usd, maxUsd);
           const meta = Math.max(10, Math.round(sz * 0.82));
           const weight = valueScale(t.usd, maxUsd) > 0.85 ? 700 : 500;
+          if (showResult && t.outcome) {
+            return `<div class="row result" style="font-size:${sz}px;padding:${Math.round(sz * 0.18)}px 0">
+               <div class="out">${escapeHtml(t.outcome)}</div>
+             </div>`;
+          }
           return `<div class="row" style="font-size:${sz}px;padding:${Math.round(sz * 0.16)}px 0">
              <div class="usd" style="font-size:${sz}px">${money(t.usd)}</div>
              <div class="mins" style="font-size:${meta}px">${fmtMins(t.minutes)}</div>

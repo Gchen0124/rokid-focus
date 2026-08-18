@@ -145,6 +145,7 @@ fun GlassHud(state: GlassState, onDim: () -> Unit = {}) {
         } else {
             Spacer(Modifier.height(4.dp))
             val maxUsd = rows.maxOf { it.usd }
+            val showResult = now.second % 9 >= 6
             var acc = 0
             rows.forEach { task ->
                 acc += task.minutes
@@ -152,6 +153,7 @@ fun GlassHud(state: GlassState, onDim: () -> Unit = {}) {
                     task = task,
                     etf = clock12(now.plusMinutes(acc.toLong())),
                     scale = valueScale(task.usd, maxUsd),
+                    showResult = showResult && task.outcome.isNotBlank(),
                 )
             }
         }
@@ -180,10 +182,25 @@ fun GlassHud(state: GlassState, onDim: () -> Unit = {}) {
 }
 
 @Composable
-private fun ValueRow(task: FocusTask, etf: String, scale: Float) {
+private fun ValueRow(task: FocusTask, etf: String, scale: Float, showResult: Boolean) {
     val titleSp = (10f + scale * 10f).sp
     val metaSp = (9f + scale * 6f).sp
     val vPad = (1f + scale * 3.5f).dp
+    if (showResult) {
+        Text(
+            text = task.outcome,
+            color = Color.White,
+            fontSize = titleSp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = (titleSp.value + 2f).sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = vPad)
+        )
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
