@@ -19,6 +19,8 @@ class MainActivity : ComponentActivity() {
     private val keyReceiver = KeyReceiver(
         onAck = { dimDisplay() },
         onExit = { exitApp() },
+        onShowResults = { app().store.update { it.copy(showResults = true) } },
+        onShowTasks = { app().store.update { it.copy(showResults = false) } },
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

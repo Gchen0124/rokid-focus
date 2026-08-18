@@ -15,4 +15,5 @@ data class GlassState(
     val lastChimeKind: ChimeKind? = null,
     val phoneLinked: Boolean = false,
     val statusLine: String = "Focus",
+    val showResults: Boolean = false,
 )

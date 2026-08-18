@@ -11,7 +11,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": "happily accepted by an incubator and get funded!"
+      "outcome": "happily accepted by an incubator and get funded!",
+      "pin": false
     },
     {
       "id": "1786973396214",
@@ -24,7 +25,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": "a 好战友加入 accomplish amazing things together and attract VC"
+      "outcome": "a 好战友加入 accomplish amazing things together and attract VC",
+      "pin": false
     },
     {
       "id": "1786973348366",
@@ -37,7 +39,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": "明亮未来的天才赢计划为很多人打开新世界"
+      "outcome": "明亮未来的天才赢计划为很多人打开新世界",
+      "pin": false
     },
     {
       "id": "1786974267384",
@@ -50,7 +53,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": ""
+      "outcome": "",
+      "pin": false
     },
     {
       "id": "1786982506203",
@@ -63,7 +67,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": "可持续的每日现金流与科研新情报"
+      "outcome": "可持续的每日现金流与科研新情报",
+      "pin": false
     },
     {
       "id": "1786973365032",
@@ -76,7 +81,8 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": "X 账户1000粉，吸引首波用户和天使投资人/agents"
+      "outcome": "X 账户1000粉，吸引首波用户和天使投资人/agents",
+      "pin": false
     },
     {
       "id": "1786974594366",
@@ -89,7 +95,36 @@
       "assignee": "me",
       "handoff": "",
       "agentStatus": "idle",
-      "outcome": ""
+      "outcome": "",
+      "pin": false
+    },
+    {
+      "id": "1787068800002",
+      "title": "mom project together",
+      "usd": 0.0,
+      "minutes": 45,
+      "done": false,
+      "doneAt": "",
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle",
+      "outcome": "和妈妈一起把她的项目往前推",
+      "pin": true
+    },
+    {
+      "id": "1787068800001",
+      "title": "reply messages AM",
+      "usd": 0.0,
+      "minutes": 20,
+      "done": false,
+      "doneAt": "",
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle",
+      "outcome": "inbox clear, nobody waiting on me",
+      "pin": true
     }
   ]
 }

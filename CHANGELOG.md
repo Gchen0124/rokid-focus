@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-18 — swipe results + morning pins
+
+- Pulse-flip (auto 3s/9s) kept in git as the previous experiment.
+- Two-finger swipe **forward** = same rows become outcomes; swipe **back** = tasks.
+- Pinned morning work: reply messages, mom project (ahead of EV sort).
+
 ## 2026-08-17 — delegation + 30m top task
 
 - `opps hunting dl` duration back to **30m**.

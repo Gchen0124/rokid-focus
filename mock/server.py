@@ -62,6 +62,7 @@ def save(body: dict) -> dict:
                 "handoff": str(item.get("handoff") or "").strip(),
                 "agentStatus": status,
                 "outcome": str(item.get("outcome") or "").strip(),
+                "pin": bool(item.get("pin")),
             }
         )
     clean.sort(key=lambda t: (-t["usd"], t["title"]))

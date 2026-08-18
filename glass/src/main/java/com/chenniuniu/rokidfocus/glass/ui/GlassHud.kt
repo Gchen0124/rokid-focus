@@ -145,7 +145,7 @@ fun GlassHud(state: GlassState, onDim: () -> Unit = {}) {
         } else {
             Spacer(Modifier.height(4.dp))
             val maxUsd = rows.maxOf { it.usd }
-            val showResult = now.second % 9 >= 6
+            val showResult = state.showResults
             var acc = 0
             rows.forEach { task ->
                 acc += task.minutes
@@ -170,7 +170,7 @@ fun GlassHud(state: GlassState, onDim: () -> Unit = {}) {
                 .padding(top = 4.dp, bottom = 3.dp)
         )
         Row(modifier = Modifier.fillMaxWidth()) {
-            Text("click=dim", color = Dim, fontSize = 11.sp)
+            Text(if (state.showResults) "swipe=tasks" else "swipe=results", color = Dim, fontSize = 11.sp)
             if (finished > 0) {
                 Spacer(Modifier.width(8.dp))
                 Text("$finished done", color = Mid, fontSize = 11.sp)
