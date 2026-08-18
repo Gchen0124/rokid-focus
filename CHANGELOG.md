@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-18 — bunny time + off-HUD schedule
+
+- :25 and :55 play TTS **“bunny time”** (`alert_bunny.wav`), not the ten-family beep.
+- Reply-messages (~12:00) and mom project (~14:00) live in `memory/SCHEDULE.md` only. Removed from the glasses list.
+
 ## 2026-08-18 — swipe results + morning pins
 
 - Pulse-flip (auto 3s/9s) kept in git as the previous experiment.

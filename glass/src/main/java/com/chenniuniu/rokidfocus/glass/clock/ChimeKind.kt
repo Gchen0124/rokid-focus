@@ -7,6 +7,7 @@ enum class ChimeKind {
     THREE_QUARTER,
     FIVE,
     TEN,
+    BUNNY,
     ;
 
     val label: String
@@ -17,6 +18,7 @@ enum class ChimeKind {
             THREE_QUARTER -> "45"
             FIVE -> "5"
             TEN -> "10"
+            BUNNY -> "bunny"
         }
 
     companion object {
@@ -28,8 +30,9 @@ enum class ChimeKind {
                 15 -> QUARTER
                 30 -> HALF
                 45 -> THREE_QUARTER
+                25, 55 -> BUNNY
                 in listOf(5, 20, 35, 50) -> FIVE
-                in listOf(10, 25, 40, 55) -> TEN
+                in listOf(10, 40) -> TEN
                 else -> error("unreachable minute $m")
             }
         }

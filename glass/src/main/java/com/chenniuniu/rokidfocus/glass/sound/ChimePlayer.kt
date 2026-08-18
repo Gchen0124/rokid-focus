@@ -21,8 +21,10 @@ class ChimePlayer(private val context: Context) {
         val wavOk = playWav(kind)
         if (!wavOk) {
             Log.w(TAG, "wav failed, using tones for $kind")
+            playTones(kind)
+        } else if (kind != ChimeKind.BUNNY) {
+            playTones(kind)
         }
-        playTones(kind)
     }
 
     fun release() {
@@ -40,6 +42,7 @@ class ChimePlayer(private val context: Context) {
             ChimeKind.THREE_QUARTER -> R.raw.chime_three_quarter
             ChimeKind.FIVE -> R.raw.chime_five
             ChimeKind.TEN -> R.raw.chime_ten
+            ChimeKind.BUNNY -> R.raw.alert_bunny
         }
         return runCatching {
             runCatching { player?.release() }
@@ -95,6 +98,10 @@ class ChimePlayer(private val context: Context) {
             ChimeKind.TEN -> listOf(
                 ToneGenerator.TONE_DTMF_7 to 110,
                 ToneGenerator.TONE_DTMF_9 to 110,
+            )
+            ChimeKind.BUNNY -> listOf(
+                ToneGenerator.TONE_PROP_BEEP2 to 160,
+                ToneGenerator.TONE_PROP_BEEP to 220,
             )
         }
         var delay = 0L

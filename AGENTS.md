@@ -11,7 +11,8 @@ Read in this order, then stop reading unless the task needs more:
 5. `memory/PROFILE.md` + `memory/PROJECTS.md` + `memory/PATTERNS.md`
 6. `memory/days/YYYY-MM-DD.md` for **today** (and yesterday if morning)
 7. `memory/queue/` — open handoffs
-8. `mock/tasks.json` — live open / done / archive / assignee list
+8. `memory/SCHEDULE.md` — clock-bound human blocks (never on the HUD)
+9. `mock/tasks.json` — live open / done / archive / assignee list
 
 Do **not** scrape the chat history, Notion, or the whole repo unless the user asks. The flywheel is these files plus `tasks.json`.
 

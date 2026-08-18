@@ -97,34 +97,6 @@
       "agentStatus": "idle",
       "outcome": "",
       "pin": false
-    },
-    {
-      "id": "1787068800002",
-      "title": "mom project together",
-      "usd": 0.0,
-      "minutes": 45,
-      "done": false,
-      "doneAt": "",
-      "archived": false,
-      "assignee": "me",
-      "handoff": "",
-      "agentStatus": "idle",
-      "outcome": "和妈妈一起把她的项目往前推",
-      "pin": true
-    },
-    {
-      "id": "1787068800001",
-      "title": "reply messages AM",
-      "usd": 0.0,
-      "minutes": 20,
-      "done": false,
-      "doneAt": "",
-      "archived": false,
-      "assignee": "me",
-      "handoff": "",
-      "agentStatus": "idle",
-      "outcome": "inbox clear, nobody waiting on me",
-      "pin": true
     }
   ]
 }
