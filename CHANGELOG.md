@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-17 — delegation + 30m top task
+
+- `opps hunting dl` duration back to **30m**.
+- Tasks can be handed to an **agent** (`assignee`, `handoff`, `agentStatus`). Protocol in `memory/DELEGATION.md`.
+- Laptop: **Give to agent** / **Take back**. Glasses hide agent-owned rows.
+
 ## 2026-08-17 — glance HUD
 
 - Daily slogan **怪奇实验室** sits under the clock, above the list.

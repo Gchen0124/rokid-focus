@@ -162,6 +162,7 @@
     }
     .item .name { flex: 1 1 100%; min-width: 0; }
     .item .usd, .item .mins { width: 110px; }
+    .item .handoff { flex: 1 1 100%; min-width: 0; }
     .item .when { font: 500 12px/1 ui-monospace, Menlo, monospace; color: #666; }
     .item .go { margin-left: auto; background: #1b7f4e; color: #fff; border: 0; font-weight: 700; }
     .ghost { background: #e6e1d8; }
@@ -210,6 +211,10 @@
     <h2>Open</h2>
     <div id="items"></div>
 
+    <h2>Agent</h2>
+    <p>Give a task to the agent. It will not mark Done. See memory/DELEGATION.md.</p>
+    <div id="agentQueue"></div>
+
     <h2>Done today</h2>
     <div id="doneToday"></div>
 
@@ -247,7 +252,7 @@
       return [...tasks].sort((a, b) => (b.usd - a.usd) || a.title.localeCompare(b.title));
     }
     function isOpen(t) { return !t.done && !t.archived; }
-    function openTasks() { return ranked().filter(isOpen); }
+    function openTasks() { return ranked().filter(t => isOpen(t) && t.assignee !== "agent"); }
     function sameDay(iso, now) {
       if (!iso) return false;
       const d = new Date(iso);
@@ -294,6 +299,9 @@
       const minutes = Number(t.minutes != null ? t.minutes : 30) || 0;
       const done = Boolean(t.done);
       const archived = Boolean(t.archived);
+      const assignee = t.assignee === "agent" ? "agent" : "me";
+      const status = ["idle", "queued", "doing", "blocked", "ready"].includes(t.agentStatus)
+        ? t.agentStatus : "idle";
       return {
         id: String(t.id || Date.now()),
         title: String(t.title || "").trim(),
@@ -302,6 +310,9 @@
         done,
         doneAt: done || archived ? String(t.doneAt || "") : "",
         archived,
+        assignee,
+        handoff: String(t.handoff || ""),
+        agentStatus: assignee === "agent" ? status : "idle",
       };
     }
     function countdown(now) {
@@ -487,18 +498,33 @@
 
       if (desk === false) return;
       const box = document.getElementById("items");
-      box.innerHTML = open.map(t =>
+      box.innerHTML = open.filter(t => t.assignee !== "agent").map(t =>
         `<div class="item" data-id="${t.id}">
            <div class="line">
              <input class="name" value="${escapeHtml(t.title)}" />
              <input class="usd" type="text" inputmode="decimal" value="${t.usd}" />
              <input class="mins" type="text" inputmode="numeric" value="${t.minutes}" />
              <button type="button" class="go done">Done</button>
+             <button type="button" class="ghost agent">Give to agent</button>
              <button type="button" class="ghost del">Delete</button>
            </div>
          </div>`
-      ).join("") || "<p>Nothing open.</p>";
+      ).join("") || "<p>Nothing open for you.</p>";
       box.querySelectorAll(".item").forEach(el => bindOpenItem(el));
+
+      const agentBox = document.getElementById("agentQueue");
+      const mine = open.filter(t => t.assignee === "agent");
+      agentBox.innerHTML = mine.map(t =>
+        `<div class="item" data-id="${t.id}">
+           <div class="line">
+             <span class="name">${escapeHtml(t.title)}</span>
+             <span class="when">${t.agentStatus || "queued"}</span>
+             <input class="handoff" placeholder="What should the agent finish?" value="${escapeHtml(t.handoff || "")}" />
+             <button type="button" class="ghost takeback">Take back</button>
+           </div>
+         </div>`
+      ).join("") || "<p>Nothing delegated.</p>";
+      agentBox.querySelectorAll(".item").forEach(el => bindAgentItem(el));
 
       const doneBox = document.getElementById("doneToday");
       doneBox.innerHTML = today.map(t =>
@@ -556,6 +582,46 @@
         render();
         push();
       });
+      const agentBtn = el.querySelector(".agent");
+      if (agentBtn) agentBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        giveToAgent(id);
+      });
+    }
+
+    function bindAgentItem(el) {
+      const id = el.dataset.id;
+      const handoff = el.querySelector(".handoff");
+      if (handoff) handoff.addEventListener("blur", () => {
+        const t = tasks.find(x => x.id === id);
+        if (!t) return;
+        t.handoff = handoff.value.trim();
+        push();
+      });
+      const back = el.querySelector(".takeback");
+      if (back) back.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        takeBack(id);
+      });
+    }
+
+    function giveToAgent(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.assignee = "agent";
+      t.agentStatus = "queued";
+      render();
+      push();
+    }
+    function takeBack(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      t.assignee = "me";
+      t.agentStatus = "idle";
+      render();
+      push();
     }
 
     function bindClosedItem(el) {
@@ -651,7 +717,7 @@
     }
 
     function editing() {
-      return Boolean(document.activeElement && document.activeElement.closest(".item, .add-grid"));
+      return Boolean(document.activeElement && document.activeElement.closest(".item, .add-grid, #agentQueue"));
     }
     pull().then(() => render(true));
     setInterval(() => { if (!editing()) render(false); }, 1000);

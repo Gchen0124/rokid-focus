@@ -13,6 +13,9 @@ data class FocusTask(
     val done: Boolean = false,
     val doneAt: String = "",
     val archived: Boolean = false,
+    val assignee: String = "me",
+    val handoff: String = "",
+    val agentStatus: String = "idle",
 ) {
     val isOpen: Boolean get() = !done && !archived
     val leveragePerHour: Double
@@ -46,7 +49,8 @@ data class FocusTask(
         fun ranked(tasks: List<FocusTask>): List<FocusTask> =
             tasks.sortedWith(compareByDescending<FocusTask> { it.usd }.thenBy { it.title })
 
-        fun open(tasks: List<FocusTask>): List<FocusTask> = ranked(tasks.filter { it.isOpen })
+        fun open(tasks: List<FocusTask>): List<FocusTask> =
+            ranked(tasks.filter { it.isOpen && it.assignee != "agent" })
 
         fun finishedCount(tasks: List<FocusTask>): Int = tasks.count { it.done || it.archived }
 
@@ -62,6 +66,9 @@ data class FocusTask(
                         .put("done", task.done)
                         .put("doneAt", task.doneAt)
                         .put("archived", task.archived)
+                        .put("assignee", task.assignee)
+                        .put("handoff", task.handoff)
+                        .put("agentStatus", task.agentStatus)
                 )
             }
             return arr.toString()
@@ -93,6 +100,9 @@ data class FocusTask(
                                 done = o.optBoolean("done", false),
                                 doneAt = o.optString("doneAt", ""),
                                 archived = o.optBoolean("archived", false),
+                                assignee = o.optString("assignee", "me").ifBlank { "me" },
+                                handoff = o.optString("handoff", ""),
+                                agentStatus = o.optString("agentStatus", "idle").ifBlank { "idle" },
                             )
                         )
                     }

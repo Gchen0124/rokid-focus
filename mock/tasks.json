@@ -4,10 +4,13 @@
       "id": "1786973510012",
       "title": "opps hunting dl",
       "usd": 300000.0,
-      "minutes": 225,
+      "minutes": 30,
       "done": false,
       "doneAt": "",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786973396214",
@@ -16,7 +19,10 @@
       "minutes": 60,
       "done": false,
       "doneAt": "",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786973348366",
@@ -25,7 +31,10 @@
       "minutes": 60,
       "done": false,
       "doneAt": "",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786974267384",
@@ -34,7 +43,10 @@
       "minutes": 30,
       "done": true,
       "doneAt": "2026-08-17T16:00:19.802Z",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786982506203",
@@ -43,7 +55,10 @@
       "minutes": 30,
       "done": false,
       "doneAt": "",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786973365032",
@@ -52,7 +67,10 @@
       "minutes": 30,
       "done": false,
       "doneAt": "",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     },
     {
       "id": "1786974594366",
@@ -61,7 +79,10 @@
       "minutes": 30,
       "done": true,
       "doneAt": "2026-08-17T16:00:14.104Z",
-      "archived": false
+      "archived": false,
+      "assignee": "me",
+      "handoff": "",
+      "agentStatus": "idle"
     }
   ]
 }

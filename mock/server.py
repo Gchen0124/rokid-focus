@@ -41,6 +41,14 @@ def save(body: dict) -> dict:
         done_at = str(item.get("doneAt") or "").strip()
         if not done and not archived:
             done_at = ""
+        assignee = str(item.get("assignee") or "me").strip().lower()
+        if assignee not in ("me", "agent"):
+            assignee = "me"
+        status = str(item.get("agentStatus") or "idle").strip().lower()
+        if status not in ("idle", "queued", "doing", "blocked", "ready"):
+            status = "idle"
+        if assignee == "me":
+            status = "idle"
         clean.append(
             {
                 "id": str(item.get("id") or ""),
@@ -50,6 +58,9 @@ def save(body: dict) -> dict:
                 "done": done,
                 "doneAt": done_at,
                 "archived": archived,
+                "assignee": assignee,
+                "handoff": str(item.get("handoff") or "").strip(),
+                "agentStatus": status,
             }
         )
     clean.sort(key=lambda t: (-t["usd"], t["title"]))

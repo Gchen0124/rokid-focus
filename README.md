@@ -81,6 +81,14 @@ Free / over is vs **17:30** local, not bedtime.
 
 Rank talks (urgency, probability, blockers, energy) are in `memory/RANK.md`. Those fields are not all in JSON yet; today’s `usd` is treated as EV.
 
+## Delegation (human ↔ agent)
+
+Optional fields on a task: `assignee` (`me` | `agent`), `handoff`, `agentStatus` (`idle` | `queued` | `doing` | `blocked` | `ready`).
+
+- Laptop **Give to agent** moves a row into the Agent section.
+- Glasses hide `assignee: agent` so the glance stays human work.
+- Protocol: [`memory/DELEGATION.md`](memory/DELEGATION.md). Other users keep the same files and swap `PROFILE.md`.
+
 ## License
 
 MIT. See `LICENSE`.

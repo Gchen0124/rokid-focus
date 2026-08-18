@@ -35,6 +35,16 @@ The laptop button is a **doorbell**, not an in-app model.
 - Tokens = one pass. Not a daemon.
 - After we agree, the Open list *is* the recommendation. No second AI panel.
 
+## Delegation (along the day)
+
+If the user hands you a task, follow `memory/DELEGATION.md`. Short version:
+
+1. `assignee: agent`, `agentStatus: queued`, write `memory/queue/<id>-<slug>.md`
+2. Do the work; set `ready` or `blocked`. Never set `done`.
+3. Human Done / Take back closes it.
+
+Glasses only show `assignee: me`. The laptop **Agent** section is the agent’s plate.
+
 ## USB / sync (not AI)
 
 | Event | Action |

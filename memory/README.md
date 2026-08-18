@@ -17,7 +17,8 @@ talk (chat)
 |---|---|---|---|
 | **Raw** | `days/YYYY-MM-DD.md` | one file per day | Append. Never rewrite history. Max ~40 lines. |
 | **Standing** | `PROFILE.md` `PROJECTS.md` `PATTERNS.md` | stays small | Rewrite in place. Delete stale bullets. Date the change. |
-| **Logic** | `RANK.md` `WORKFLOW.md` | rare | Change only when we agree the system changed. |
+| **Logic** | `RANK.md` `WORKFLOW.md` `DELEGATION.md` | rare | Change only when we agree the system changed. |
+| **Queue** | `queue/<id>-<slug>.md` | one file per handoff | Delete when the human accepts. |
 
 If a day note is repeating the same sentence three days in a row, **promote** it to PATTERNS or PROFILE and stop repeating it in days.
 
