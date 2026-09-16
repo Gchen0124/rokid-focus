@@ -57,6 +57,12 @@ class FocusBridge(private val store: GlassStore) {
                     fields.getOrNull(3)?.toIntOrNull() ?: 30,
                 )
                 "still_on_this" -> store.stillOnThis()
+                "set_listen_proxy" -> store.update {
+                    it.copy(
+                        listenHost = fields.getOrNull(1)?.ifBlank { it.listenHost } ?: it.listenHost,
+                        listenPort = fields.getOrNull(2)?.toIntOrNull() ?: it.listenPort,
+                    )
+                }
             }
         }
     }

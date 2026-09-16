@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -18,6 +20,12 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val props = Properties()
+        val f = rootProject.file("local.properties")
+        if (f.exists()) props.load(f.inputStream())
+        fun esc(k: String) = "\"${props.getProperty(k, "").replace("\"", "\\\"")}\""
+        buildConfigField("String", "DOUBAO_API_KEY", esc("doubao.api.key"))
+        buildConfigField("String", "DEEPSEEK_API_KEY", esc("deepseek.api.key"))
     }
 
     buildTypes {
@@ -35,6 +43,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -58,4 +67,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation("com.rokid.cxr:client-l:1.0.4")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
 }

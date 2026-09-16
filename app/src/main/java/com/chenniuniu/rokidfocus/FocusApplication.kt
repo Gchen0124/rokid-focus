@@ -4,6 +4,7 @@ import android.app.Application
 import com.chenniuniu.rokidfocus.data.FocusStore
 import com.chenniuniu.rokidfocus.glasses.CxrHudController
 import com.chenniuniu.rokidfocus.glasses.GlassesStatus
+import com.chenniuniu.rokidfocus.listen.ListenProxy
 
 class FocusApplication : Application() {
 
@@ -13,10 +14,17 @@ class FocusApplication : Application() {
     lateinit var glasses: CxrHudController
         private set
 
+    lateinit var listen: ListenProxy
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
         store = FocusStore(this)
+        listen = ListenProxy(this) { bind ->
+            store.update { it.copy(listenBind = bind, statusLine = "Listen $bind") }
+        }
+        runCatching { listen.start() }
         glasses = CxrHudController(this) { status, message ->
             store.update {
                 it.copy(

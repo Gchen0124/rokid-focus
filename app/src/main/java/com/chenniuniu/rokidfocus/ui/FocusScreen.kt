@@ -84,6 +84,12 @@ fun FocusScreen(
             "Ranked list by value. Glasses show the same list + a small clock. Swipe is the opportunity calendar.",
             style = MaterialTheme.typography.bodyMedium
         )
+        if (state.listenBind.isNotBlank()) {
+            Text(
+                "Glasses listen proxy: ${state.listenBind}  ·  hotspot or same Wi-Fi. USB 127.0.0.1 still works.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

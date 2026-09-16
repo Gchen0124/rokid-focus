@@ -21,8 +21,6 @@ import kotlin.math.sqrt
 class ConvoListen(
     private val context: Context,
     private val store: GlassStore,
-    private val host: String = "127.0.0.1",
-    private val port: Int = 8791,
 ) {
     private val running = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
@@ -36,17 +34,32 @@ class ConvoListen(
     fun start() {
         if (!running.compareAndSet(false, true)) return
         store.update { it.copy(listenLine = "listen…", convoActive = false) }
+        val snap = store.snapshot()
+        val hosts = listOf(snap.listenHost, "127.0.0.1", "192.168.43.1", "192.168.49.1")
+            .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val port = snap.listenPort.takeIf { it > 0 } ?: 8791
+        tryHost(hosts, 0, port)
+    }
+
+    private fun tryHost(hosts: List<String>, index: Int, port: Int) {
+        if (!running.get()) return
+        if (index >= hosts.size) {
+            store.update { it.copy(listenLine = "no proxy", convoActive = false) }
+            running.set(false)
+            return
+        }
+        val host = hosts[index]
+        store.update { it.copy(listenLine = "try $host") }
         val sock = SimpleWs(
             host = host,
             port = port,
             onText = { text -> main.post { onWsText(text) } },
             onOpen = { main.post { onWsOpen() } },
             onFail = { err ->
+                Log.w(TAG, "$host $err")
                 main.post {
-                    store.update { it.copy(listenLine = "no proxy", convoActive = false) }
-                    running.set(false)
+                    if (running.get()) tryHost(hosts, index + 1, port)
                 }
-                Log.w(TAG, err)
             },
         )
         ws = sock
@@ -90,7 +103,14 @@ class ConvoListen(
                 if (line.isBlank()) return
                 val definite = o.optBoolean("definite")
                 val who = classifyWho()
-                showConvo(line, partial = !definite, who = who)
+                val remote = mutableListOf<String>()
+                o.optJSONArray("drafts")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val s = arr.optString(i).trim()
+                        if (s.isNotEmpty()) remote.add(s)
+                    }
+                }
+                showConvo(line, partial = !definite, who = who, remoteDrafts = remote)
                 if (definite) {
                     utterRms = 0.0
                     utterN = 0
@@ -148,8 +168,12 @@ class ConvoListen(
         }, "convo-mic").start()
     }
 
-    private fun showConvo(line: String, partial: Boolean, who: String) {
-        val drafts = if (who == "them" && !partial) THEM_DRAFTS else emptyList()
+    private fun showConvo(line: String, partial: Boolean, who: String, remoteDrafts: List<String> = emptyList()) {
+        val drafts = when {
+            who != "them" || partial -> emptyList()
+            remoteDrafts.size >= 2 -> (remoteDrafts.take(2) + "skip")
+            else -> THEM_DRAFTS
+        }
         val hideFocus = who == "them"
         store.update {
             it.copy(

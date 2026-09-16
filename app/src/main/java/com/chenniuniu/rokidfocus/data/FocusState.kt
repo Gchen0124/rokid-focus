@@ -20,4 +20,5 @@ data class FocusState(
     val syncLine: String = "Not synced",
     val opportunities: List<Opportunity> = emptyList(),
     val slogan: String = "怪奇实验室 + 外交官",
+    val listenBind: String = "",
 )
