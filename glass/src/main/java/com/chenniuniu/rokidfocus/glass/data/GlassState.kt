@@ -24,6 +24,8 @@ data class GlassState(
     val convoWho: String = "", // "you" | "them"
     val convoDrafts: List<String> = emptyList(),
     val convoPick: Int = 0,
+    val convoHist: List<String> = emptyList(),
+    val convoScroll: Int = 0,
     val listenLine: String = "off",
     val listenHost: String = "127.0.0.1",
     val listenPort: Int = 8791,

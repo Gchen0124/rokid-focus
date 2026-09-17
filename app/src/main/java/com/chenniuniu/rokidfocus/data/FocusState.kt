@@ -2,6 +2,7 @@ package com.chenniuniu.rokidfocus.data
 
 import com.chenniuniu.rokidfocus.clock.ChimeKind
 import com.chenniuniu.rokidfocus.glasses.GlassesStatus
+import com.chenniuniu.rokidfocus.listen.ConvoTurn
 
 data class FocusState(
     val priority: String = "",
@@ -21,4 +22,13 @@ data class FocusState(
     val opportunities: List<Opportunity> = emptyList(),
     val slogan: String = "怪奇实验室 + 外交官",
     val listenBind: String = "",
+    val listenLive: Boolean = false,
+    val talkStyle: String = "怪奇实验室 + 外交官",
+    val convoTurns: List<ConvoTurn> = emptyList(),
+    val convoLiveWho: String = "",
+    val convoLiveText: String = "",
+    val replyKeySet: Boolean = false,
+    val llmLine: String = "",
+    val voiceEnrolled: Boolean = false,
+    val enrollLine: String = "",
 )

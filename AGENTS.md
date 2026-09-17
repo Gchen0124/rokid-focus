@@ -15,6 +15,8 @@ Read in this order, then stop reading unless the task needs more:
 9. `mock/tasks.json` — live open / done / archive / assignee list
 10. `memory/hunting/README.md` — if the work is opportunity hunting (Notion funding DB + daily report)
 
+**Live listen / glasses convo helper:** [`docs/LISTEN.md`](docs/LISTEN.md) is the source of truth (iFlytek ASR, DeepSeek reactions, Caps, HUD). Do not resurrect Doubao for live listen.
+
 Do **not** scrape the chat history, Notion, or the whole repo unless the user asks. The flywheel is these files plus `tasks.json`.
 
 ## What this system is

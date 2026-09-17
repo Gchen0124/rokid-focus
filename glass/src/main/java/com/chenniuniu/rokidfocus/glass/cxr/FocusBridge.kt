@@ -1,5 +1,7 @@
 package com.chenniuniu.rokidfocus.glass.cxr
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.chenniuniu.rokidfocus.glass.clock.ChimeKind
 import com.chenniuniu.rokidfocus.glass.data.GlassStore
@@ -19,7 +21,12 @@ import com.rokid.cxr.Caps
  */
 class FocusBridge(private val store: GlassStore) {
 
+    var onPhoneListen: ((Boolean) -> Unit)? = null
+
     private val bridge = CXRServiceBridge()
+    private val main = Handler(Looper.getMainLooper())
+    private var hideRunnable: Runnable? = null
+    private val pcmGate = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val statusListener = object : CXRServiceBridge.StatusListener {
         override fun onConnected(p0: String?, p1: String?, p2: Int) {
@@ -57,11 +64,54 @@ class FocusBridge(private val store: GlassStore) {
                     fields.getOrNull(3)?.toIntOrNull() ?: 30,
                 )
                 "still_on_this" -> store.stillOnThis()
+                "listen_start" -> main.post { onPhoneListen?.invoke(true) }
+                "listen_stop" -> main.post { onPhoneListen?.invoke(false) }
                 "set_listen_proxy" -> store.update {
                     it.copy(
                         listenHost = fields.getOrNull(1)?.ifBlank { it.listenHost } ?: it.listenHost,
                         listenPort = fields.getOrNull(2)?.toIntOrNull() ?: it.listenPort,
                     )
+                }
+                "listen_state" -> {
+                    val st = fields.getOrNull(1).orEmpty()
+                    val msg = fields.getOrNull(2).orEmpty()
+                    val line = when (st) {
+                        "live" -> when {
+                            msg.isBlank() || msg == "phone" -> "live"
+                            msg == "ok" -> "live"
+                            else -> msg.take(18)
+                        }
+                        "off" -> "off"
+                        "err" -> shortErr(msg)
+                        else -> st.ifBlank { "live" }
+                    }
+                    store.update { it.copy(listenLine = line) }
+                    if (st == "off") clearConvo()
+                }
+                "asr" -> applyAsr(
+                    text = fields.getOrNull(1).orEmpty(),
+                    definite = fields.getOrNull(2) == "1",
+                    who = fields.getOrNull(3).orEmpty(),
+                )
+                "react" -> {
+                    val drafts = fields.drop(1).filter { it.isNotBlank() }
+                    val incoming = when {
+                        drafts.size == 1 && drafts[0] == "…" -> listOf("…")
+                        drafts.size >= 2 -> (drafts.take(2) + "skip")
+                        else -> emptyList()
+                    }
+                    if (incoming.isNotEmpty()) {
+                        store.update {
+                            it.copy(
+                                convoActive = true,
+                                convoDrafts = incoming,
+                                convoPick = 0,
+                            )
+                        }
+                    }
+                }
+                "convo_hist" -> store.update {
+                    it.copy(convoHist = fields.drop(1).filter { line -> line.isNotBlank() })
                 }
             }
         }
@@ -78,6 +128,61 @@ class FocusBridge(private val store: GlassStore) {
 
     fun sendStillOnThis() {
         send("still_on_this")
+    }
+
+    fun sendListen(on: Boolean) {
+        send(if (on) "listen_on" else "listen_off")
+    }
+
+    fun sendPcm(pcm: ByteArray): Boolean {
+        if (pcm.isEmpty()) return false
+        if (!pcmGate.compareAndSet(false, true)) return false
+        return try {
+            val code = bridge.sendMessage(
+                CMD_KEY,
+                Caps().apply {
+                    write("pcm")
+                    write(pcm)
+                },
+            )
+            if (code != 0) Log.w(TAG, "pcm send $code")
+            code == 0
+        } catch (e: Exception) {
+            Log.w(TAG, "pcm ${e.message}")
+            false
+        } finally {
+            pcmGate.set(false)
+        }
+    }
+
+    fun clearConvo() {
+        hideRunnable?.let { main.removeCallbacks(it) }
+        store.update {
+            it.copy(
+                convoActive = false,
+                convoLine = "",
+                convoDrafts = emptyList(),
+                convoWho = "",
+                convoHist = emptyList(),
+                listenLine = if (it.listenLine == "live") "off" else it.listenLine,
+            )
+        }
+    }
+
+    private fun applyAsr(text: String, definite: Boolean, who: String) {
+        val line = text.trim()
+        if (line.isBlank()) return
+        store.update {
+            it.copy(
+                convoActive = true,
+                convoLine = line,
+                convoPartial = !definite,
+                convoWho = who,
+                convoScroll = 0,
+                listenLine = "live",
+            )
+        }
+        hideRunnable?.let { main.removeCallbacks(it) }
     }
 
     private fun send(vararg parts: String) {
@@ -104,5 +209,16 @@ class FocusBridge(private val store: GlassStore) {
         private const val TAG = "FocusBridge"
         const val CLIENT_KEY = "rk_custom_client"
         const val CMD_KEY = "rk_custom_key"
+        private const val HIDE_AFTER_MS = 8000L
+
+        private fun shortErr(msg: String): String {
+            val s = msg.lowercase()
+            return when {
+                s.contains("timeout") || s.contains("waiting next") -> "live"
+                s.contains("no mic") -> "no mic"
+                s.contains("no key") || s.contains("xfyun") || s.contains("no xfyun") -> "no key"
+                else -> "asr"
+            }
+        }
     }
 }

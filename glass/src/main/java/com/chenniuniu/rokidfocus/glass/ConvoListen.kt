@@ -8,6 +8,7 @@ import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.chenniuniu.rokidfocus.glass.cxr.FocusBridge
 import com.chenniuniu.rokidfocus.glass.data.GlassStore
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
@@ -15,30 +16,60 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Opt-in glasses mic → Doubao. Silence is not uploaded.
+ * Opt-in glasses mic → phone (iFlytek).
  * Near-field loud = wearer; quieter = other person.
  */
 class ConvoListen(
     private val context: Context,
     private val store: GlassStore,
+    private val bridge: FocusBridge? = null,
 ) {
     private val running = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
     private var ws: SimpleWs? = null
     private var rec: AudioRecord? = null
+    private var recThread: Thread? = null
     private var hideRunnable: Runnable? = null
     private var utterRms = 0.0
     private var utterN = 0
     private var loudEma = 4000.0
 
-    fun start() {
+    fun start(notifyPhone: Boolean = true) {
         if (!running.compareAndSet(false, true)) return
         store.update { it.copy(listenLine = "listen…", convoActive = false) }
-        val snap = store.snapshot()
-        val hosts = listOf(snap.listenHost, "127.0.0.1", "192.168.43.1", "192.168.49.1")
-            .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        val port = snap.listenPort.takeIf { it > 0 } ?: 8791
-        tryHost(hosts, 0, port)
+        if (store.snapshot().phoneLinked && bridge != null) {
+            store.update { it.copy(listenLine = "phone") }
+            if (notifyPhone) bridge.sendListen(true)
+            main.removeCallbacks(beginRec)
+            main.postDelayed(beginRec, 250)
+            main.postDelayed({
+                if (!running.get()) return@postDelayed
+                val line = store.snapshot().listenLine
+                if (line == "phone") {
+                    store.update { it.copy(listenLine = "open Focus on phone") }
+                }
+            }, 4000)
+            return
+        }
+        startLan()
+    }
+
+    private fun startLan() {
+        Thread({
+            var found: String? = null
+            NetHosts.withMulticast(context) { found = NetHosts.discoverPhone() }
+            val snap = store.snapshot()
+            val hosts = (listOfNotNull(found) + snap.listenHost + NetHosts.gateways(context) +
+                listOf("127.0.0.1", "192.168.43.1", "192.168.49.1"))
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val port = snap.listenPort.takeIf { it > 0 } ?: 8791
+            main.post {
+                if (!running.get()) return@post
+                if (store.snapshot().listenLine == "live") return@post
+                store.update { it.copy(listenLine = "try ${hosts.firstOrNull() ?: "?"}") }
+                tryHost(hosts, 0, port)
+            }
+        }, "convo-discover").start()
     }
 
     private fun tryHost(hosts: List<String>, index: Int, port: Int) {
@@ -58,7 +89,9 @@ class ConvoListen(
             onFail = { err ->
                 Log.w(TAG, "$host $err")
                 main.post {
-                    if (running.get()) tryHost(hosts, index + 1, port)
+                    if (running.get() && store.snapshot().listenLine != "live") {
+                        tryHost(hosts, index + 1, port)
+                    }
                 }
             },
         )
@@ -66,15 +99,23 @@ class ConvoListen(
         sock.connect()
     }
 
+    private val beginRec = Runnable {
+        if (running.get()) startRecord()
+    }
+
     fun stop() {
         running.set(false)
+        main.removeCallbacks(beginRec)
         hideRunnable?.let { main.removeCallbacks(it) }
         runCatching { rec?.stop() }
+        runCatching { recThread?.join(500) }
         runCatching { rec?.release() }
         rec = null
+        recThread = null
         ws?.sendText("""{"type":"stop"}""")
         ws?.close()
         ws = null
+        bridge?.sendListen(false)
         store.update {
             it.copy(
                 convoActive = false,
@@ -127,11 +168,17 @@ class ConvoListen(
 
     @SuppressLint("MissingPermission")
     private fun startRecord() {
+        runCatching { rec?.stop() }
+        runCatching { recThread?.join(400) }
+        runCatching { rec?.release() }
+        rec = null
+        recThread = null
         val buf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             .coerceAtLeast(CHUNK)
         val recorder = try {
             AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, buf)
         } catch (e: Exception) {
+            Log.w(TAG, "mic $e")
             store.update { it.copy(listenLine = "mic fail") }
             return
         }
@@ -142,7 +189,8 @@ class ConvoListen(
         }
         rec = recorder
         recorder.startRecording()
-        Thread({
+        store.update { it.copy(listenLine = "rec") }
+        val thread = Thread({
             val pcm = ByteArray(CHUNK)
             var hang = 0
             try {
@@ -150,31 +198,33 @@ class ConvoListen(
                     val n = recorder.read(pcm, 0, pcm.size)
                     if (n <= 0) continue
                     val r = rms(pcm, n)
-                    if (r >= RMS_VAD) {
-                        hang = HANG_CHUNKS
+                    if (r >= 80) {
                         utterRms += r
                         utterN += 1
                         if (r > loudEma) loudEma = loudEma * 0.9 + r * 0.1
-                        ws?.sendBinary(pcm.copyOf(n))
-                    } else if (hang > 0) {
-                        hang -= 1
-                        ws?.sendBinary(pcm.copyOf(n))
                     }
-                    // silence: do not send — Doubao hours pack bills streamed audio
+                    pushPcm(pcm.copyOf(n))
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "record ${e.message}")
             }
-        }, "convo-mic").start()
+        }, "convo-mic")
+        recThread = thread
+        thread.start()
+    }
+
+    private fun pushPcm(chunk: ByteArray) {
+        if (bridge != null) bridge.sendPcm(chunk) else ws?.sendBinary(chunk)
     }
 
     private fun showConvo(line: String, partial: Boolean, who: String, remoteDrafts: List<String> = emptyList()) {
         val drafts = when {
-            who != "them" || partial -> emptyList()
+            partial -> emptyList()
+            remoteDrafts.size == 1 && remoteDrafts[0] == "…" -> listOf("…")
             remoteDrafts.size >= 2 -> (remoteDrafts.take(2) + "skip")
-            else -> THEM_DRAFTS
+            else -> emptyList()
         }
-        val hideFocus = who == "them"
+        val hideFocus = true
         store.update {
             it.copy(
                 convoActive = hideFocus,
@@ -212,11 +262,10 @@ class ConvoListen(
     companion object {
         private const val TAG = "ConvoListen"
         private const val RATE = 16000
-        private const val CHUNK = 3200
-        private const val RMS_VAD = 500.0
+        private const val CHUNK = 6400
+        private const val RMS_VAD = 400.0
         private const val RMS_YOU = 2200.0
-        private const val HANG_CHUNKS = 4
+        private const val HANG_CHUNKS = 3
         private const val HIDE_AFTER_MS = 8000L
-        val THEM_DRAFTS = listOf("嗯，然后呢？", "我明白。", "skip")
     }
 }

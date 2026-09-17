@@ -4,6 +4,8 @@ A **5-minute glance HUD** for [Rokid Glasses](https://rokid.com) plus a **laptop
 
 Any agent continuing this project: **read [`AGENTS.md`](AGENTS.md) first.** Daily priority memory lives in [`memory/`](memory/).
 
+**Live listen / convo HUD (iFlytek + DeepSeek):** read [`docs/LISTEN.md`](docs/LISTEN.md) before touching ASR, reactions, or glasses convo UI.
+
 ## What you see
 
 ```

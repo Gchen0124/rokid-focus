@@ -24,8 +24,10 @@ android {
         val f = rootProject.file("local.properties")
         if (f.exists()) props.load(f.inputStream())
         fun esc(k: String) = "\"${props.getProperty(k, "").replace("\"", "\\\"")}\""
-        buildConfigField("String", "DOUBAO_API_KEY", esc("doubao.api.key"))
         buildConfigField("String", "DEEPSEEK_API_KEY", esc("deepseek.api.key"))
+        buildConfigField("String", "XFYUN_APP_ID", esc("xfyun.app.id"))
+        buildConfigField("String", "XFYUN_API_KEY", esc("xfyun.api.key"))
+        buildConfigField("String", "XFYUN_API_SECRET", esc("xfyun.api.secret"))
     }
 
     buildTypes {
@@ -67,6 +69,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation("com.rokid.cxr:client-l:1.0.4")
+    implementation("com.rokid.cxr:cxr-service-bridge:1.0-20260417.063502-103")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
 }

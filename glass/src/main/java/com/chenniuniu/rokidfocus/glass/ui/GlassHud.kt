@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -60,6 +61,10 @@ private val Cap = Color(0xFFC8F5D8)
 private val Over = Color(0xFFE8FFD0)
 private val Track = Color(0xFF163322)
 private val Slogan = Color(0xFFFFFFFF)
+private val SelectBg = Color(0xFF00FF66)
+private val SelectInk = Color(0xFF001408)
+private val SlotBg = Color(0xFF071F12)
+private val Gold = Color(0xFFFFE08A)
 private const val CutoffHour = 17
 private const val CutoffMinute = 30
 private const val DailySlogan = "怪奇实验室 + 外交官"
@@ -147,37 +152,64 @@ fun GlassHud(
         }
 
         if (state.convoActive) {
-            val them = state.convoWho != "you"
-            Text(
-                text = if (them) "THEY SAID" else "YOU SAID",
-                color = if (them) Color(0xFF9AD4FF) else Color(0xFFFFE08A),
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = state.convoLine.ifBlank { "…" },
-                color = if (state.convoPartial) Mid else Green,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 26.sp,
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            if (them && state.convoDrafts.isNotEmpty()) {
-                Text("say?", color = Dim, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 10.dp))
-                state.convoDrafts.forEachIndexed { i, d ->
-                    val on = i == state.convoPick
-                    Text(
-                        text = (if (on) "▸ " else "  ") + d,
-                        color = if (on) Green else Mid,
-                        fontSize = if (on) 16.sp else 13.sp,
-                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    val who = state.convoWho
+                    val role = when {
+                        who == "you" -> "YOU"
+                        who.startsWith("them") && who.length > 4 -> "S${who.removePrefix("them")}"
+                        who.startsWith("them") -> "THEY"
+                        else -> "THEY"
+                    }
+                    val log = state.convoHist.filter { it.isNotBlank() } +
+                        listOf("$role  ${state.convoLine}".trim())
+                    val lines = log.flatMap { wrapGlyphs(it, 20) }
+                    val maxShow = 7
+                    val scroll = state.convoScroll.coerceIn(0, (lines.size - 1).coerceAtLeast(0))
+                    val end = (lines.size - scroll).coerceAtLeast(0)
+                    val start = (end - maxShow).coerceAtLeast(0)
+                    val window = if (end > start) lines.subList(start, end) else emptyList()
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth(),
+                    ) {
+                        if (scroll > 0) {
+                            Text(
+                                "◂ swipe  older",
+                                color = Dim,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                        window.forEachIndexed { i, line ->
+                            val newest = scroll == 0 && i == window.lastIndex
+                            Text(
+                                text = line,
+                                color = if (newest) Green else Mid,
+                                fontSize = if (newest) 16.sp else 13.sp,
+                                fontWeight = if (newest) FontWeight.Bold else FontWeight.Normal,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                lineHeight = 18.sp,
+                            )
+                        }
+                    }
                 }
-                Text("swipe = pick  ·  tap = mic off", color = Dim, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
+                ReactMenu(
+                    drafts = state.convoDrafts,
+                    pick = state.convoPick,
+                    pulse = (state.clockLabel.lastOrNull()?.code ?: 0) % 2 == 0,
+                )
             }
         } else if (state.showResults) {
             Text(
@@ -257,7 +289,7 @@ fun GlassHud(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        if (!state.convoActive) Spacer(Modifier.weight(1f))
         if (state.listenLine.isNotBlank()) {
             Text(
                 text = "mic ${state.listenLine}",
@@ -285,7 +317,13 @@ fun GlassHud(
                 color = Dim,
                 fontSize = 11.sp,
             )
-            Text(if (state.showResults) "swipe=tasks" else "swipe=results+cal", color = Dim, fontSize = 11.sp)
+            Text(
+                if (state.convoActive) "swipe=history"
+                else if (state.showResults) "swipe=tasks"
+                else "swipe=results+cal",
+                color = Dim,
+                fontSize = 11.sp,
+            )
             if (finished > 0) {
                 Spacer(Modifier.width(8.dp))
                 Text("$finished done", color = Mid, fontSize = 11.sp)
@@ -294,6 +332,98 @@ fun GlassHud(
             Text("back=exit", color = Dim, fontSize = 11.sp)
         }
     }
+}
+
+private val SlotKey = listOf("A", "B", "C")
+private val SlotTag = listOf("LEAN", "TURN", "SKIP")
+
+private fun wrapGlyphs(s: String, width: Int): List<String> {
+    if (s.isBlank()) return emptyList()
+    val out = ArrayList<String>()
+    var i = 0
+    while (i < s.length) {
+        val e = minOf(i + width, s.length)
+        out.add(s.substring(i, e))
+        i = e
+    }
+    return out
+}
+
+@Composable
+private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
+    val rolling = drafts.size == 1 && drafts[0] == "…"
+    val rows = if (rolling) emptyList() else drafts.take(3)
+    Text(
+        text = if (rolling || rows.isEmpty()) "◆  REACT" else "◆  REACT",
+        color = Gold,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
+    )
+    if (rows.isEmpty()) {
+        Text(
+            text = if (pulse) "listening…" else "listening   ",
+            color = Dim,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SlotBg)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        )
+        return
+    }
+    rows.forEachIndexed { i, line ->
+        val on = i == pick
+        val key = SlotKey.getOrElse(i) { "${i + 1}" }
+        val tag = if (line.equals("skip", true)) "SKIP" else SlotTag.getOrElse(i) { "SAY" }
+        val cursor = when {
+            on && pulse -> "▶"
+            on -> "▷"
+            else -> " "
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 3.dp)
+                .background(if (on) SelectBg else SlotBg)
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "$cursor [$key]",
+                    color = if (on) SelectInk else Gold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Text(
+                    text = " $tag ",
+                    color = if (on) SelectInk else Dim,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Text(
+                    text = line,
+                    color = if (on) SelectInk else if (tag == "SKIP") Dim else Mid,
+                    fontSize = if (on) 16.sp else 14.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+    Text(
+        text = "swipe = A/B/C   tap = mic off",
+        color = Dim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier.padding(top = 6.dp),
+    )
 }
 
 @Composable

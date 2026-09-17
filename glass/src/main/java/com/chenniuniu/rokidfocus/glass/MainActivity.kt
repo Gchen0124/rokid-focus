@@ -22,9 +22,10 @@ import com.chenniuniu.rokidfocus.glass.ui.GlassHud
 class MainActivity : ComponentActivity() {
 
     private var convo: ConvoListen? = null
+    private var pendingFromPhone = false
 
     private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) startConvo()
+        if (ok) startConvo(fromPhone = pendingFromPhone)
         else app().store.update { it.copy(listenLine = "mic denied") }
     }
 
@@ -43,9 +44,10 @@ class MainActivity : ComponentActivity() {
         onToggleListen = { toggleListen() },
         onCycleDraft = { delta ->
             val s = app().store.snapshot()
-            if (s.convoActive && s.convoDrafts.isNotEmpty()) {
-                val n = s.convoDrafts.size
-                app().store.update { it.copy(convoPick = (it.convoPick + delta + n) % n) }
+            if (s.convoActive) {
+                app().store.update {
+                    it.copy(convoScroll = (it.convoScroll - delta).coerceIn(0, 80))
+                }
             }
         },
     )
@@ -83,6 +85,19 @@ class MainActivity : ComponentActivity() {
         }
         DisplayWake.applyDim(this, store.snapshot().dimLevel, store.snapshot().checkInActive)
         store.update { it.copy(listenLine = "off") }
+        app().bridge.onPhoneListen = { on ->
+            runOnUiThread {
+                if (on) {
+                    if (convo?.isOn == true) return@runOnUiThread
+                    pendingFromPhone = true
+                    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    if (granted) startConvo(fromPhone = true) else askMic.launch(Manifest.permission.RECORD_AUDIO)
+                } else {
+                    convo?.stop()
+                    convo = null
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -118,14 +133,15 @@ class MainActivity : ComponentActivity() {
             convo = null
             return
         }
+        pendingFromPhone = false
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (granted) startConvo() else askMic.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    private fun startConvo() {
-        if (convo?.isOn == true) return
+    private fun startConvo(fromPhone: Boolean = false) {
         convo?.stop()
-        convo = ConvoListen(this, app().store).also { it.start() }
+        convo = null
+        convo = ConvoListen(this, app().store, app().bridge).also { it.start(notifyPhone = !fromPhone) }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

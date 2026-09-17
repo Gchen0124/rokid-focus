@@ -1,6 +1,8 @@
 package com.chenniuniu.rokidfocus.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -29,10 +31,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chenniuniu.rokidfocus.FocusViewModel
 import com.chenniuniu.rokidfocus.clock.ChimeKind
 import com.chenniuniu.rokidfocus.data.FocusTask
+import com.chenniuniu.rokidfocus.listen.ConvoTurn
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -43,7 +50,7 @@ fun FocusScreen(
     val state by viewModel.state.collectAsState()
     var draft by rememberSaveable { mutableStateOf("") }
     var draftValue by rememberSaveable { mutableIntStateOf(5) }
-    var tab by rememberSaveable { mutableStateOf("swipe") }
+    var tab by rememberSaveable { mutableStateOf("convo") }
 
     Column(
         modifier = Modifier
@@ -59,6 +66,7 @@ fun FocusScreen(
         ) {
             FilterChip(selected = tab == "swipe", onClick = { tab = "swipe" }, label = { Text("Swipe") })
             FilterChip(selected = tab == "desk", onClick = { tab = "desk" }, label = { Text("Desk") })
+            FilterChip(selected = tab == "convo", onClick = { tab = "convo" }, label = { Text("Convo") })
             Spacer(Modifier.weight(1f))
             Text(state.syncLine, style = MaterialTheme.typography.bodySmall)
         }
@@ -69,6 +77,18 @@ fun FocusScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(top = 8.dp),
+            )
+        } else if (tab == "convo") {
+            ConvoHistory(
+                turns = state.convoTurns,
+                liveWho = state.convoLiveWho,
+                liveText = state.convoLiveText,
+                llmLine = state.llmLine,
+                listenLive = state.listenLive,
+                onClear = { viewModel.clearConvo() },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
         } else {
     Column(
@@ -84,10 +104,18 @@ fun FocusScreen(
             "Ranked list by value. Glasses show the same list + a small clock. Swipe is the opportunity calendar.",
             style = MaterialTheme.typography.bodyMedium
         )
+        Text(
+            if (state.listenLive) {
+                "Listening — iFlytek on this phone (Wi‑Fi or 5G)."
+            } else {
+                "Listen rides the glasses pairing link. Phone Wi‑Fi or 5G is the internet. Connect glasses, then tap the temple (or Listen below)."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
         if (state.listenBind.isNotBlank()) {
             Text(
-                "Glasses listen proxy: ${state.listenBind}  ·  hotspot or same Wi-Fi. USB 127.0.0.1 still works.",
-                style = MaterialTheme.typography.bodyMedium,
+                "LAN fallback ${state.listenBind} if pairing audio is down.",
+                style = MaterialTheme.typography.bodySmall,
             )
         }
 
@@ -186,6 +214,69 @@ fun FocusScreen(
         OutlinedButton(onClick = onConnectGlasses, modifier = Modifier.fillMaxWidth()) {
             Text("Connect glasses")
         }
+        Button(
+            onClick = { viewModel.toggleListen() },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (state.listenLive) "Stop listen" else "Listen")
+        }
+        OutlinedButton(onClick = { viewModel.beginVoiceEnroll() }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (state.voiceEnrolled) "Re-register my voice (12s)" else "Register my voice (12s)")
+        }
+        if (state.enrollLine.isNotBlank()) {
+            Text(state.enrollLine, style = MaterialTheme.typography.bodySmall)
+        }
+
+        Text("How you talk", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Reactions are written in this voice, using the whole convo, not only the last line.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(
+                "怪奇实验室 + 外交官",
+                "短、直接、不客套",
+                "温和留余地",
+                "好奇追问",
+            ).forEach { style ->
+                FilterChip(
+                    selected = state.talkStyle == style,
+                    onClick = { viewModel.setTalkStyle(style) },
+                    label = { Text(style) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = state.talkStyle,
+            onValueChange = { viewModel.setTalkStyle(it) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Talk style") },
+            placeholder = { Text("怪奇实验室 + 外交官") },
+        )
+        var replyKey by rememberSaveable { mutableStateOf("") }
+        OutlinedTextField(
+            value = replyKey,
+            onValueChange = {
+                replyKey = it
+                viewModel.setReplyKey(it)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("DeepSeek key (replies)") },
+            placeholder = {
+                Text(if (state.replyKeySet) "saved — paste to replace" else "sk-… DeepSeek replies, not ASR")
+            },
+            singleLine = true,
+        )
+        if (state.llmLine.isNotBlank()) {
+            Text(state.llmLine, style = MaterialTheme.typography.bodySmall)
+        }
+
+        if (state.convoTurns.isNotEmpty()) {
+            Text(
+                "${state.convoTurns.size} turns in Convo tab",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         Text("Preview chimes", style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -197,6 +288,121 @@ fun FocusScreen(
         }
         Spacer(Modifier.height(24.dp))
     }
+        }
+    }
+}
+
+@Composable
+private fun ConvoHistory(
+    turns: List<ConvoTurn>,
+    liveWho: String,
+    liveText: String,
+    llmLine: String,
+    listenLive: Boolean,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Convo history", style = MaterialTheme.typography.headlineSmall)
+            if (turns.isNotEmpty()) TextButton(onClick = onClear) { Text("Clear") }
+        }
+        Text(
+            when {
+                listenLive && liveText.isNotBlank() -> "Live · $llmLine".trimEnd(' ', '·')
+                listenLive -> "Listening. Lines land here as they finish."
+                llmLine.isNotBlank() -> llmLine
+                else -> "Saved on this phone. ASR lines + DeepSeek say? options."
+            },
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (turns.isEmpty() && liveText.isBlank()) {
+            Text("Nothing yet. Connect glasses, listen, talk.", style = MaterialTheme.typography.bodyMedium)
+        }
+        turns.forEach { turn ->
+            if (turn.who == "sys") {
+                Text(
+                    "— ${turn.text}  ${turn.timeLabel()} —",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(vertical = 6.dp),
+                )
+            } else {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "${turn.timeLabel()}  ${turn.label}",
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Text(turn.text, style = MaterialTheme.typography.bodyLarge)
+                        if (turn.replies.isNotEmpty()) {
+                            ReplyRack(turn.replies)
+                        }
+                    }
+                }
+            }
+        }
+        if (liveText.isNotBlank()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "LIVE  ${when {
+                            liveWho == "you" -> "YOU"
+                            liveWho.startsWith("them") && liveWho.length > 4 -> "S${liveWho.removePrefix("them")}"
+                            else -> "THEY"
+                        }}",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(liveText, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+private val SlotKey = listOf("A", "B", "C")
+private val SlotTag = listOf("LEAN", "TURN", "SKIP")
+private val SlotBg = Color(0xFF071F12)
+private val SlotGreen = Color(0xFF00FF66)
+private val SlotGold = Color(0xFFFFE08A)
+private val SlotDim = Color(0xFF3D7A58)
+
+@Composable
+private fun ReplyRack(replies: List<String>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .background(SlotBg)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            "◆  REACT",
+            color = SlotGold,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+        )
+        replies.take(3).forEachIndexed { i, line ->
+            val key = SlotKey.getOrElse(i) { "${i + 1}" }
+            val tag = if (line.equals("skip", true)) "SKIP" else SlotTag.getOrElse(i) { "SAY" }
+            Text(
+                "[$key] $tag  $line",
+                color = if (tag == "SKIP") SlotDim else SlotGreen,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            )
         }
     }
 }

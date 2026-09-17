@@ -23,6 +23,8 @@ class ListenProxy(private val context: Context, private val onBind: (String) -> 
     var bindIp: String = "0.0.0.0"
         private set
 
+    @Volatile private var beaconOn = false
+
     fun start() {
         if (server != null) return
         bindIp = localIpv4() ?: "0.0.0.0"
@@ -31,30 +33,72 @@ class ListenProxy(private val context: Context, private val onBind: (String) -> 
         s.start()
         onBind("$bindIp:$port")
         Log.i(TAG, "listen proxy $bindIp:$port")
+        startBeacon()
     }
 
     fun stop() {
+        beaconOn = false
         runCatching { server?.stop(500) }
         server = null
     }
 
+    private fun startBeacon() {
+        beaconOn = true
+        Thread({
+            val sock = java.net.DatagramSocket()
+            sock.broadcast = true
+            while (beaconOn) {
+                val ip = localIpv4() ?: bindIp
+                if (ip != "0.0.0.0") {
+                    val payload = "rokid-listen $ip $port"
+                    val data = payload.toByteArray()
+                    runCatching {
+                        sock.send(
+                            java.net.DatagramPacket(
+                                data,
+                                data.size,
+                                java.net.InetAddress.getByName("255.255.255.255"),
+                                18791,
+                            )
+                        )
+                    }
+                }
+                Thread.sleep(1500)
+            }
+            sock.close()
+        }, "listen-beacon").start()
+    }
+
     private inner class Server : WebSocketServer(InetSocketAddress(port)) {
-        private val sessions = ConcurrentHashMap<WebSocket, DoubaoAsr>()
+        private val sessions = ConcurrentHashMap<WebSocket, XfyunAsr>()
 
         override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
-            val key = BuildConfig.DOUBAO_API_KEY
-            if (key.isBlank()) {
-                conn.send(JSONObject().put("type", "error").put("error", "no doubao key").toString())
+            if (BuildConfig.XFYUN_APP_ID.isBlank()) {
+                conn.send(JSONObject().put("type", "error").put("error", "no xfyun").toString())
                 return
             }
-            val asr = DoubaoAsr(
-                apiKey = key,
-                onText = { text, definite ->
-                    val o = JSONObject().put("type", "asr").put("text", text).put("definite", definite)
+            val app0 = runCatching { context.applicationContext as com.chenniuniu.rokidfocus.FocusApplication }.getOrNull()
+            val asr = XfyunAsr(
+                featureIds = app0?.store?.voiceId().orEmpty(),
+                onText = { text, definite, speaker ->
+                    val who = if (speaker > 1) "them" else if (speaker == 1) "you" else "them"
+                    val o = JSONObject().put("type", "asr").put("text", text).put("definite", definite).put("who", who)
                     if (definite) {
                         pool.execute {
-                            val drafts = Drafts.fromDeepseek(text, BuildConfig.DEEPSEEK_API_KEY)
-                            o.put("drafts", JSONArray(drafts))
+                            val app = runCatching { context.applicationContext as com.chenniuniu.rokidfocus.FocusApplication }.getOrNull()
+                            app?.convo?.add(who, text)
+                            app?.store?.appendConvo(who, text)
+                            val result = Drafts.fromConvo(
+                                convo = app?.convo?.prompt().orEmpty(),
+                                lastThem = text,
+                                style = app?.store?.snapshot()?.talkStyle.orEmpty(),
+                                apiKey = app?.store?.replyKey().orEmpty(),
+                            )
+                            app?.store?.setLlmLine(result.status)
+                            if (result.replies.isNotEmpty()) {
+                                app?.store?.setLastReplies(result.replies)
+                                o.put("drafts", JSONArray(result.replies))
+                            }
                             runCatching { conn.send(o.toString()) }
                         }
                     } else {

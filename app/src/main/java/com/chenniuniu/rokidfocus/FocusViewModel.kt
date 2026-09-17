@@ -131,6 +131,27 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         app.glasses.requestAuth(activity)
     }
 
+    fun toggleListen() {
+        app.glasses.toggleListen()
+    }
+
+    fun beginVoiceEnroll() {
+        app.glasses.beginVoiceEnroll()
+    }
+
+    fun setTalkStyle(value: String) {
+        app.store.setTalkStyle(value)
+    }
+
+    fun setReplyKey(value: String) {
+        app.store.setReplyKey(value)
+    }
+
+    fun clearConvo() {
+        app.convo.clear()
+        app.store.clearConvo()
+    }
+
     fun onAuthResult(resultCode: Int, data: Intent?) {
         app.glasses.parseAuth(resultCode, data)
     }
