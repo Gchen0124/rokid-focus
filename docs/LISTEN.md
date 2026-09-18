@@ -72,7 +72,13 @@ Docs:
 - Auth: HMAC-SHA1 over sorted URL-encoded query (`XfyunSign.kt`).  
   `accessKeyId` = APIKey, secret = APISecret, `appId`, `utc` `yyyy-MM-dd'T'HH:mm:ss+0800`.
 
-Handshake was verified from this Mac. **autominor (37 langs incl. Korean) returns 35020** on this APPID — not entitled. App tries `autominor` first, then falls back to **`autodialect` = 中文 + 英语 + 202 方言**. Korean needs a console ticket.
+Handshake verified. **`autominor` is enabled** (37 langs including Korean). App connects with `lang=autominor` and `eng_vad_mdn=1` (far-field). Falls back to `autodialect` only if handshake fails.
+
+Quiet other speakers: phone applies AGC boost (up to ~12×) before iFlytek so far-field speech is louder; wearer (already loud) is not boosted. Enroll still uses unboosted PCM.
+
+If the ASR websocket drops, PhoneListen reconnects (`rejoin`) with OkHttp ping every 15s.
+
+Non-zh/en transcript: DeepSeek translates to native (default 中文). HUD shows original + translation. English while native is 中文 → bilingual options (`EN | 中文`). Korean/other → options in native only. Chinese speech → Chinese options. Desk **Mother tongue** chip sets native.
 
 Send **1280 bytes / 40ms** PCM s16le 16kHz mono (`XfyunAsr` pump). Fill silence frames so the 15s idle timeout does not kill the socket. **Never close WS until listen off.**
 

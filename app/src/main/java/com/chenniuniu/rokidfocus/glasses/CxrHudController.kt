@@ -43,9 +43,11 @@ class CxrHudController(
     private val app get() = appContext as FocusApplication
 
     private val listen = PhoneListen(
+        context = appContext,
         memory = app.convo,
         seed = { app.store.snapshot().convoTurns },
         style = { app.store.snapshot().talkStyle },
+        nativeLang = { app.store.snapshot().nativeLang },
         llmKey = { app.store.replyKey() },
         voiceId = { app.store.voiceId() },
         onEnroll = { ok, msg ->
@@ -58,11 +60,13 @@ class CxrHudController(
         },
         onLog = { },
         onTurn = { who, text -> app.store.appendConvo(who, text) },
-        onLive = { who, text -> app.store.setConvoLive(who, text) },
+        onLive = { who, text, trans -> app.store.setConvoLive(who, text, trans) },
         onReplies = { replies -> app.store.setLastReplies(replies) },
+        onTrans = { trans -> app.store.setLastTrans(trans) },
         onLlm = { status -> app.store.setLlmLine(status) },
-        sendAsr = { text, _, who, _ ->
-            send("asr", text, "0", who)
+        sendAsr = { text, who, trans ->
+            if (trans.isBlank()) send("asr", text, "0", who)
+            else send("asr", text, "0", who, trans)
         },
         sendReact = { drafts ->
             if (drafts.isNotEmpty()) send("react", *drafts.toTypedArray())
@@ -71,6 +75,7 @@ class CxrHudController(
             if (lines.isNotEmpty()) send("convo_hist", *lines.takeLast(6).toTypedArray())
         },
         sendState = { state, msg -> send("listen_state", state, msg) },
+        onPhoneMic = { line -> app.store.setLlmLine(line) },
     )
 
     val requestCode: Int = REQUEST_AUTH

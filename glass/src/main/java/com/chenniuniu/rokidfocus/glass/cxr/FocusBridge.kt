@@ -92,6 +92,7 @@ class FocusBridge(private val store: GlassStore) {
                     text = fields.getOrNull(1).orEmpty(),
                     definite = fields.getOrNull(2) == "1",
                     who = fields.getOrNull(3).orEmpty(),
+                    trans = fields.getOrNull(4).orEmpty(),
                 )
                 "react" -> {
                     val drafts = fields.drop(1).filter { it.isNotBlank() }
@@ -161,6 +162,7 @@ class FocusBridge(private val store: GlassStore) {
             it.copy(
                 convoActive = false,
                 convoLine = "",
+                convoTrans = "",
                 convoDrafts = emptyList(),
                 convoWho = "",
                 convoHist = emptyList(),
@@ -169,13 +171,14 @@ class FocusBridge(private val store: GlassStore) {
         }
     }
 
-    private fun applyAsr(text: String, definite: Boolean, who: String) {
+    private fun applyAsr(text: String, definite: Boolean, who: String, trans: String = "") {
         val line = text.trim()
         if (line.isBlank()) return
         store.update {
             it.copy(
                 convoActive = true,
                 convoLine = line,
+                convoTrans = trans,
                 convoPartial = !definite,
                 convoWho = who,
                 convoScroll = 0,

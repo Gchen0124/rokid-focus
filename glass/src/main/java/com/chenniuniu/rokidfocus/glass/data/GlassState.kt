@@ -20,6 +20,7 @@ data class GlassState(
     val opportunities: List<Opportunity> = emptyList(),
     val convoActive: Boolean = false,
     val convoLine: String = "",
+    val convoTrans: String = "",
     val convoPartial: Boolean = false,
     val convoWho: String = "", // "you" | "them"
     val convoDrafts: List<String> = emptyList(),

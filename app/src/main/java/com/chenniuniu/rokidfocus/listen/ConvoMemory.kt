@@ -9,6 +9,7 @@ import java.util.Locale
 data class ConvoTurn(
     val who: String,
     val text: String,
+    val trans: String = "",
     val replies: List<String> = emptyList(),
     val at: Long = System.currentTimeMillis(),
 ) {
@@ -32,6 +33,7 @@ data class ConvoTurn(
                     JSONObject()
                         .put("who", t.who)
                         .put("text", t.text)
+                        .put("trans", t.trans)
                         .put("at", t.at)
                         .put("replies", JSONArray(t.replies)),
                 )
@@ -53,6 +55,7 @@ data class ConvoTurn(
                         ConvoTurn(
                             who = o.optString("who"),
                             text = o.optString("text"),
+                            trans = o.optString("trans"),
                             replies = replies.filter { it.isNotBlank() && it != "…" },
                             at = o.optLong("at", 0L),
                         ),
@@ -96,5 +99,8 @@ class ConvoMemory {
         .joinToString("\n") { "${it.label}: ${it.text}" }
 
     fun hudLines(n: Int = 6): List<String> =
-        snapshot().filter { it.who != "sys" }.takeLast(n).map { "${it.label}  ${it.text.take(80)}" }
+        snapshot().filter { it.who != "sys" }.takeLast(n).flatMap { t ->
+            listOf("${t.label}  ${t.text.take(80)}") +
+                if (t.trans.isNotBlank()) listOf("  ${t.trans.take(80)}") else emptyList()
+        }
 }

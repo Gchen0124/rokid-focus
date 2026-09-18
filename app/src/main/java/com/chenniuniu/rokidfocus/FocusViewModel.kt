@@ -143,6 +143,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         app.store.setTalkStyle(value)
     }
 
+    fun setNativeLang(code: String) {
+        app.store.setNativeLang(code)
+    }
+
     fun setReplyKey(value: String) {
         app.store.setReplyKey(value)
     }

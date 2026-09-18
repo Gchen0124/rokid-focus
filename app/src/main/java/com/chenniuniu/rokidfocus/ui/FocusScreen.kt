@@ -46,6 +46,7 @@ import com.chenniuniu.rokidfocus.listen.ConvoTurn
 fun FocusScreen(
     viewModel: FocusViewModel,
     onConnectGlasses: () -> Unit,
+    onListen: () -> Unit = { viewModel.toggleListen() },
 ) {
     val state by viewModel.state.collectAsState()
     var draft by rememberSaveable { mutableStateOf("") }
@@ -83,6 +84,7 @@ fun FocusScreen(
                 turns = state.convoTurns,
                 liveWho = state.convoLiveWho,
                 liveText = state.convoLiveText,
+                liveTrans = state.convoLiveTrans,
                 llmLine = state.llmLine,
                 listenLive = state.listenLive,
                 onClear = { viewModel.clearConvo() },
@@ -215,7 +217,7 @@ fun FocusScreen(
             Text("Connect glasses")
         }
         Button(
-            onClick = { viewModel.toggleListen() },
+            onClick = onListen,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (state.listenLive) "Stop listen" else "Listen")
@@ -227,6 +229,19 @@ fun FocusScreen(
             Text(state.enrollLine, style = MaterialTheme.typography.bodySmall)
         }
 
+        Text("Mother tongue", style = MaterialTheme.typography.titleMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(
+                selected = state.nativeLang == "zh",
+                onClick = { viewModel.setNativeLang("zh") },
+                label = { Text("中文") },
+            )
+            FilterChip(
+                selected = state.nativeLang == "en",
+                onClick = { viewModel.setNativeLang("en") },
+                label = { Text("English") },
+            )
+        }
         Text("How you talk", style = MaterialTheme.typography.titleMedium)
         Text(
             "Reactions are written in this voice, using the whole convo, not only the last line.",
@@ -297,6 +312,7 @@ private fun ConvoHistory(
     turns: List<ConvoTurn>,
     liveWho: String,
     liveText: String,
+    liveTrans: String,
     llmLine: String,
     listenLive: Boolean,
     onClear: () -> Unit,
@@ -328,7 +344,25 @@ private fun ConvoHistory(
         if (turns.isEmpty() && liveText.isBlank()) {
             Text("Nothing yet. Connect glasses, listen, talk.", style = MaterialTheme.typography.bodyMedium)
         }
-        turns.forEach { turn ->
+        if (liveText.isNotBlank()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "LIVE  ${when {
+                            liveWho == "you" -> "YOU"
+                            liveWho.startsWith("them") && liveWho.length > 4 -> "S${liveWho.removePrefix("them")}"
+                            else -> "THEY"
+                        }}",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(liveText, style = MaterialTheme.typography.bodyLarge)
+                    if (liveTrans.isNotBlank()) {
+                        Text(liveTrans, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+        turns.asReversed().forEach { turn ->
             if (turn.who == "sys") {
                 Text(
                     "— ${turn.text}  ${turn.timeLabel()} —",
@@ -343,25 +377,13 @@ private fun ConvoHistory(
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Text(turn.text, style = MaterialTheme.typography.bodyLarge)
+                        if (turn.trans.isNotBlank()) {
+                            Text(turn.trans, style = MaterialTheme.typography.bodyMedium)
+                        }
                         if (turn.replies.isNotEmpty()) {
                             ReplyRack(turn.replies)
                         }
                     }
-                }
-            }
-        }
-        if (liveText.isNotBlank()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "LIVE  ${when {
-                            liveWho == "you" -> "YOU"
-                            liveWho.startsWith("them") && liveWho.length > 4 -> "S${liveWho.removePrefix("them")}"
-                            else -> "THEY"
-                        }}",
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(liveText, style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }
@@ -386,13 +408,6 @@ private fun ReplyRack(replies: List<String>) {
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            "◆  REACT",
-            color = SlotGold,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-        )
         replies.take(3).forEachIndexed { i, line ->
             val key = SlotKey.getOrElse(i) { "${i + 1}" }
             val tag = if (line.equals("skip", true)) "SKIP" else SlotTag.getOrElse(i) { "SAY" }

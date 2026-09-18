@@ -148,7 +148,9 @@ fun GlassHud(
                     )
                 }
             }
-            TimeRings(now = now, modifier = Modifier.size(118.dp))
+            if (!state.convoActive) {
+                TimeRings(now = now, modifier = Modifier.size(118.dp))
+            }
         }
 
         if (state.convoActive) {
@@ -169,9 +171,12 @@ fun GlassHud(
                         who.startsWith("them") -> "THEY"
                         else -> "THEY"
                     }
-                    val log = state.convoHist.filter { it.isNotBlank() } +
-                        listOf("$role  ${state.convoLine}".trim())
-                    val lines = log.flatMap { wrapGlyphs(it, 20) }
+                    val current = buildList {
+                        add("$role  ${state.convoLine}".trim())
+                        if (state.convoTrans.isNotBlank()) add("  ${state.convoTrans}")
+                    }
+                    val log = state.convoHist.filter { it.isNotBlank() } + current
+                    val lines = log.flatMap { wrapGlyphs(it, if (state.convoActive) 34 else 20) }
                     val maxShow = 7
                     val scroll = state.convoScroll.coerceIn(0, (lines.size - 1).coerceAtLeast(0))
                     val end = (lines.size - scroll).coerceAtLeast(0)
@@ -353,14 +358,6 @@ private fun wrapGlyphs(s: String, width: Int): List<String> {
 private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
     val rolling = drafts.size == 1 && drafts[0] == "…"
     val rows = if (rolling) emptyList() else drafts.take(3)
-    Text(
-        text = if (rolling || rows.isEmpty()) "◆  REACT" else "◆  REACT",
-        color = Gold,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
-        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-    )
     if (rows.isEmpty()) {
         Text(
             text = if (pulse) "listening…" else "listening   ",
@@ -394,36 +391,35 @@ private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
                 Text(
                     text = "$cursor [$key]",
                     color = if (on) SelectInk else Gold,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                 )
-                Text(
-                    text = " $tag ",
-                    color = if (on) SelectInk else Dim,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-                Text(
-                    text = line,
-                    color = if (on) SelectInk else if (tag == "SKIP") Dim else Mid,
-                    fontSize = if (on) 16.sp else 14.sp,
-                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                val parts = line.split(" | ", limit = 2)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = parts[0],
+                        color = if (on) SelectInk else if (tag == "SKIP") Dim else Mid,
+                        fontSize = if (on) 15.sp else 13.sp,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (parts.size > 1) {
+                        Text(
+                            text = parts[1],
+                            color = if (on) SelectInk else Dim,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
-    Text(
-        text = "swipe = A/B/C   tap = mic off",
-        color = Dim,
-        fontSize = 11.sp,
-        fontFamily = FontFamily.Monospace,
-        modifier = Modifier.padding(top = 6.dp),
-    )
 }
 
 @Composable

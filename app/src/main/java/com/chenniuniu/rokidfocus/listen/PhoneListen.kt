@@ -15,21 +15,25 @@ import kotlin.math.sqrt
  * Glasses PCM → iFlytek realtime LLM ASR (role_type=2). DeepSeek writes replies.
  */
 class PhoneListen(
+    private val context: android.content.Context,
     private val memory: ConvoMemory,
     private val seed: () -> List<ConvoTurn> = { emptyList() },
     private val style: () -> String,
+    private val nativeLang: () -> String = { "zh" },
     private val llmKey: () -> String,
     private val voiceId: () -> String = { "" },
     private val onEnroll: (ok: Boolean, msg: String) -> Unit = { _, _ -> },
     private val onLog: (List<ConvoTurn>) -> Unit = {},
     private val onTurn: (who: String, text: String) -> Unit = { _, _ -> },
-    private val onLive: (who: String, text: String) -> Unit = { _, _ -> },
+    private val onLive: (who: String, text: String, trans: String) -> Unit = { _, _, _ -> },
     private val onReplies: (List<String>) -> Unit = {},
+    private val onTrans: (String) -> Unit = {},
     private val onLlm: (String) -> Unit = {},
-    private val sendAsr: (text: String, definite: Boolean, who: String, drafts: List<String>) -> Unit,
+    private val sendAsr: (text: String, who: String, trans: String) -> Unit,
     private val sendReact: (drafts: List<String>) -> Unit = {},
     private val sendHist: (List<String>) -> Unit = {},
     private val sendState: (state: String, msg: String) -> Unit,
+    private val onPhoneMic: (String) -> Unit = {},
 ) {
     private val running = AtomicBoolean(false)
     private val pool = Executors.newCachedThreadPool()
@@ -53,6 +57,11 @@ class PhoneListen(
     private val para = StringBuilder()
     private var paraWho = ""
     private var liveUtt = ""
+    private var lastTrans = ""
+    private var phonePcmCount = 0
+    private var noKeySent = false
+    private val phoneMic = PhoneMic(context)
+    private val mixer = PcmMixer { frame -> emitMixed(frame) }
 
     val isOn: Boolean get() = running.get()
 
@@ -73,14 +82,28 @@ class PhoneListen(
         para.clear()
         paraWho = ""
         liveUtt = ""
+        lastTrans = ""
         currentRl = 0
         wearerRl = 0
         enrollBuf = null
         suggestGen.incrementAndGet()
+        phonePcmCount = 0
+        noKeySent = false
         memory.replace(seed())
         sendState("live", "phone")
+        mixer.start()
+        startPhoneMic()
         main.postDelayed(noMicWatch, 5000)
         Log.i(TAG, "listen start")
+    }
+
+    private fun startPhoneMic() {
+        if (!phoneMic.hasPermission()) {
+            onPhoneMic("phone mic: no permission")
+            return
+        }
+        val ok = phoneMic.start { pcm -> onPhonePcm(pcm) }
+        onPhoneMic(if (ok) "phone mic on" else "phone mic fail")
     }
 
     fun stop() {
@@ -92,6 +115,8 @@ class PhoneListen(
         pendingWho = "them"
         running.set(false)
         flushPara(keepListen = false)
+        phoneMic.stop()
+        mixer.stop()
         closeAsr()
         sendState("off", "")
         Log.i(TAG, "listen stop")
@@ -126,9 +151,23 @@ class PhoneListen(
             utterN += 1
             if (r > loudEma) loudEma = loudEma * 0.9 + r * 0.1
         }
-        ensureAsr()
-        asr?.sendPcm(pcm, last = false)
+        mixer.pushGlasses(boostFar(pcm, r))
         lastKeepAt = now
+    }
+
+    private fun onPhonePcm(pcm: ByteArray) {
+        if (!running.get() || pcm.isEmpty()) return
+        if (phonePcmCount == 0) {
+            phonePcmCount++
+            main.removeCallbacks(noMicWatch)
+        }
+        mixer.pushPhone(pcm)
+    }
+
+    private fun emitMixed(frame: ByteArray) {
+        if (!running.get()) return
+        ensureAsr()
+        asr?.sendPcm(frame, last = false)
     }
 
     private val keepAlive = object : Runnable {
@@ -141,7 +180,7 @@ class PhoneListen(
     }
 
     private val noMicWatch = Runnable {
-        if (running.get() && pcmCount == 0) sendState("err", "no mic")
+        if (running.get() && pcmCount == 0 && phonePcmCount == 0) sendState("err", "no mic")
     }
 
     private fun ensureAsr() {
@@ -150,7 +189,10 @@ class PhoneListen(
             return
         }
         if (BuildConfig.XFYUN_APP_ID.isBlank() || BuildConfig.XFYUN_API_KEY.isBlank()) {
-            sendState("err", "no xfyun")
+            if (!noKeySent) {
+                noKeySent = true
+                sendState("err", "no xfyun")
+            }
             return
         }
         val session = XfyunAsr(
@@ -161,7 +203,10 @@ class PhoneListen(
                 asrOpen = false
                 asr = null
                 main.removeCallbacks(keepAlive)
-                if (running.get()) sendState("err", err.take(18))
+                if (running.get()) {
+                    sendState("live", "rejoin")
+                    main.postDelayed({ if (running.get() && asr == null) ensureAsr() }, 500)
+                }
             },
             onReady = { sendState("live", "xfyun") },
         )
@@ -204,6 +249,20 @@ class PhoneListen(
             val t = shownText()
             memory.add(who, t)
             onTurn(who, t)
+            if (Lang.needsTrans(t, nativeLang())) {
+                val key = llmKey()
+                val native = nativeLang()
+                pool.execute {
+                    val zh = Drafts.translate(t, native, key)
+                    if (zh.isNotBlank() && running.get()) {
+                        lastTrans = zh
+                        onTrans(zh)
+                        main.post { pushTranscript() }
+                    }
+                }
+            } else {
+                lastTrans = ""
+            }
             if (who != "you") scheduleSuggest(t, who)
         } else {
             liveUtt = line
@@ -247,8 +306,8 @@ class PhoneListen(
     private fun pushTranscript() {
         val who = paraWho.ifBlank { lastPartialWho }
         val text = shownText()
-        onLive(who, text)
-        sendAsr(text.takeLast(500), false, who, emptyList())
+        onLive(who, text, lastTrans)
+        sendAsr(text.takeLast(500), who, lastTrans)
         sendHist(memory.hudLines(6))
     }
 
@@ -266,7 +325,7 @@ class PhoneListen(
         para.clear()
         liveUtt = ""
         paraWho = ""
-        if (!keepListen) onLive("", "")
+        if (!keepListen) onLive("", "", "")
     }
 
     private val suggestRun = Runnable {
@@ -276,8 +335,10 @@ class PhoneListen(
         val convo = memory.prompt()
         val tone = style()
         val key = llmKey()
+        val native = nativeLang()
+        val mode = Lang.optionMode(line, native)
         pool.execute {
-            val result = Drafts.fromConvo(convo, line, tone, key)
+            val result = Drafts.fromConvo(convo, line, tone, key, optionMode = mode, native = native)
             if (gen != suggestGen.get() || !running.get()) return@execute
             main.post {
                 onLlm(result.status)
@@ -309,6 +370,22 @@ class PhoneListen(
         return if (rl > 1) "them$rl" else "them"
     }
 
+    private fun boostFar(pcm: ByteArray, rms: Double): ByteArray {
+        if (rms < 60.0 || rms >= FAR_TARGET) return pcm
+        val gain = (FAR_TARGET / rms).coerceAtMost(FAR_GAIN_MAX)
+        val out = ByteArray(pcm.size)
+        var i = 0
+        while (i + 1 < pcm.size) {
+            val v = (pcm[i].toInt() and 0xff) or (pcm[i + 1].toInt() shl 8)
+            val sample = if (v > 32767) v - 65536 else v
+            val boosted = (sample * gain).toInt().coerceIn(-32767, 32767)
+            out[i] = (boosted and 0xff).toByte()
+            out[i + 1] = ((boosted shr 8) and 0xff).toByte()
+            i += 2
+        }
+        return out
+    }
+
     private fun classifyWho(): String {
         val avg = if (utterN > 0) utterRms / utterN else 0.0
         val youCut = max(2200.0, loudEma * 0.55)
@@ -321,6 +398,8 @@ class PhoneListen(
         private const val RMS_YOU = 3500.0
         private const val KEEP_MS = 250L
         private const val SUGGEST_DEBOUNCE_MS = 280L
+        private const val FAR_TARGET = 3200.0
+        private const val FAR_GAIN_MAX = 12.0
         private const val ENROLL_BYTES = 16000 * 2 * 12
 
         fun isIdleTimeout(err: String): Boolean {

@@ -24,7 +24,10 @@ class XfyunAsr(
     private val onFail: (String) -> Unit,
     private val onReady: () -> Unit = {},
 ) {
-    private val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+    private val http = OkHttpClient.Builder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(15, TimeUnit.SECONDS)
+        .build()
     private var ws: WebSocket? = null
     private var sessionId: String? = null
     @Volatile private var closed = false
@@ -46,8 +49,8 @@ class XfyunAsr(
             "lang" to if (triedMinor) "autodialect" else "autominor",
             "samplerate" to "16000",
             "role_type" to "2",
+            "eng_vad_mdn" to "1",
         )
-        if (!triedMinor) extra["recognized_language"] = "cn,en,ko,ja"
         if (featureIds.isNotBlank()) {
             extra["feature_ids"] = featureIds
             extra["eng_spk_match"] = "1"
@@ -89,6 +92,7 @@ class XfyunAsr(
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 ready.set(false)
+                if (!closed) onFail("closed $code")
             }
         })
         val th = HandlerThread("xfyun-pcm")

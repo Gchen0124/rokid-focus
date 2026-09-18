@@ -20,6 +20,7 @@ class FocusStore(context: Context) {
             opportunities = Opportunity.fromJson(prefs.getString(KEY_OPPS, null)),
             slogan = prefs.getString(KEY_SLOGAN, DEFAULT_SLOGAN) ?: DEFAULT_SLOGAN,
             talkStyle = prefs.getString(KEY_TALK, DEFAULT_TALK) ?: DEFAULT_TALK,
+            nativeLang = prefs.getString(KEY_NATIVE, "zh") ?: "zh",
             replyKeySet = replyKeyFromPrefs().isNotBlank(),
             llmLine = if (replyKeyFromPrefs().isNotBlank()) "DeepSeek ready" else "Paste DeepSeek key for replies",
             convoTurns = com.chenniuniu.rokidfocus.listen.ConvoTurn.fromJson(prefs.getString(KEY_CONVO, null)),
@@ -119,22 +120,41 @@ class FocusStore(context: Context) {
         _state.update { it.copy(talkStyle = clean) }
     }
 
+    fun setNativeLang(code: String) {
+        val clean = if (code == "en") "en" else "zh"
+        prefs.edit().putString(KEY_NATIVE, clean).apply()
+        _state.update { it.copy(nativeLang = clean) }
+    }
+
     fun setConvoTurns(turns: List<com.chenniuniu.rokidfocus.listen.ConvoTurn>) {
         saveConvo(turns)
     }
 
-    fun appendConvo(who: String, text: String) {
+    fun appendConvo(who: String, text: String, trans: String = "") {
         val t = text.trim()
         if (t.isBlank()) return
         val cur = _state.value.convoTurns.toMutableList()
         val last = cur.lastOrNull()
         if (last != null && last.who == who) {
             val merged = if (t.startsWith(last.text)) t else (last.text + " " + t).trim()
-            cur[cur.lastIndex] = last.copy(text = merged.take(2000), replies = emptyList(), at = System.currentTimeMillis())
+            cur[cur.lastIndex] = last.copy(
+                text = merged.take(2000),
+                trans = trans.ifBlank { last.trans },
+                replies = emptyList(),
+                at = System.currentTimeMillis(),
+            )
         } else {
-            cur.add(com.chenniuniu.rokidfocus.listen.ConvoTurn(who = who, text = t.take(2000)))
+            cur.add(com.chenniuniu.rokidfocus.listen.ConvoTurn(who = who, text = t.take(2000), trans = trans))
         }
         saveConvo(cur.takeLast(200))
+    }
+
+    fun setLastTrans(trans: String) {
+        if (trans.isBlank()) return
+        val cur = _state.value.convoTurns.toMutableList()
+        if (cur.isEmpty()) return
+        cur[cur.lastIndex] = cur.last().copy(trans = trans)
+        saveConvo(cur)
     }
 
     fun setLastReplies(replies: List<String>) {
@@ -148,16 +168,16 @@ class FocusStore(context: Context) {
 
     fun clearConvo() {
         saveConvo(emptyList())
-        _state.update { it.copy(convoLiveWho = "", convoLiveText = "") }
+        _state.update { it.copy(convoLiveWho = "", convoLiveText = "", convoLiveTrans = "") }
     }
 
-    fun setConvoLive(who: String, text: String) {
-        _state.update { it.copy(convoLiveWho = who, convoLiveText = text) }
+    fun setConvoLive(who: String, text: String, trans: String = "") {
+        _state.update { it.copy(convoLiveWho = who, convoLiveText = text, convoLiveTrans = trans) }
     }
 
     fun markListen(on: Boolean) {
         appendConvo("sys", if (on) "listen on" else "listen off")
-        if (!on) _state.update { it.copy(convoLiveWho = "", convoLiveText = "") }
+        if (!on) _state.update { it.copy(convoLiveWho = "", convoLiveText = "", convoLiveTrans = "") }
     }
 
     private fun saveConvo(turns: List<com.chenniuniu.rokidfocus.listen.ConvoTurn>) {
@@ -218,6 +238,7 @@ class FocusStore(context: Context) {
         private const val KEY_OPPS = "opportunities_json"
         private const val KEY_SLOGAN = "slogan"
         private const val KEY_TALK = "talk_style"
+        private const val KEY_NATIVE = "native_lang"
         private const val KEY_REPLY = "deepseek_reply_key"
         private const val KEY_CONVO = "convo_history_json"
         private const val KEY_VP = "xfyun_feature_id"
