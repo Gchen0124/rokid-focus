@@ -78,18 +78,46 @@ class ConvoMemory {
         items.filter { it.who == "you" || it.who.startsWith("them") }.takeLast(24).forEach { turns.addLast(it) }
     }
 
-    fun add(who: String, text: String) = synchronized(lock) {
+    fun add(who: String, text: String, trans: String = "") = synchronized(lock) {
         val t = text.trim()
         if (t.isBlank()) return
-        val last = turns.lastOrNull()
+        var last = turns.lastOrNull()
+        // Same sentence caught by both mics: keep the glasses/you version.
+        if (last != null && last.who != who &&
+            System.currentTimeMillis() - last.at < ECHO_DEDUPE_WINDOW_MS && isEcho(last.text, t)
+        ) {
+            if (who == "them") return
+            turns.removeLast()
+            last = turns.lastOrNull()
+        }
         if (last != null && last.who == who) {
             val merged = if (t.startsWith(last.text)) t else (last.text + " " + t).trim()
             turns.removeLast()
-            turns.addLast(last.copy(text = merged.take(2000), replies = emptyList(), at = System.currentTimeMillis()))
+            turns.addLast(
+                last.copy(
+                    text = merged.take(2000),
+                    trans = trans.ifBlank { last.trans },
+                    replies = emptyList(),
+                    at = System.currentTimeMillis(),
+                ),
+            )
         } else {
-            turns.addLast(ConvoTurn(who, t.take(2000)))
+            turns.addLast(ConvoTurn(who, t.take(2000), trans = trans))
         }
         while (turns.size > 24) turns.removeFirst()
+    }
+
+    /** Late-arriving translation: match the turn by text (a new sentence may have started). */
+    fun setTrans(text: String, trans: String) = synchronized(lock) {
+        val t = text.trim()
+        val tr = trans.trim()
+        if (t.isBlank() || tr.isBlank()) return
+        val key = t.take(40)
+        val idx = turns.indexOfLast {
+            it.text.startsWith(key) || key.startsWith(it.text.take(40))
+        }
+        if (idx < 0) return
+        turns.add(idx, turns.removeAt(idx).copy(trans = tr))
     }
 
     fun snapshot(): List<ConvoTurn> = synchronized(lock) { turns.toList() }
@@ -98,9 +126,9 @@ class ConvoMemory {
         .filter { it.who == "you" || it.who.startsWith("them") }
         .joinToString("\n") { "${it.label}: ${it.text}" }
 
+    // "\u241F" separates who / original / translation on the glasses HUD.
     fun hudLines(n: Int = 6): List<String> =
-        snapshot().filter { it.who != "sys" }.takeLast(n).flatMap { t ->
-            listOf("${t.label}  ${t.text.take(80)}") +
-                if (t.trans.isNotBlank()) listOf("  ${t.trans.take(80)}") else emptyList()
+        snapshot().filter { it.who != "sys" }.takeLast(n).map { t ->
+            "${t.who}\u241F${t.text.take(120)}\u241F${t.trans.take(120)}"
         }
 }

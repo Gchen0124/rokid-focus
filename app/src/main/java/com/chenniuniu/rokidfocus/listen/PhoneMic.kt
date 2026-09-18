@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * The glasses mic mostly hears the wearer. Hold the phone toward the other
  * person and this mic becomes the near-field source for what THEY say.
- * Output is 16 kHz mono s16le, which [PcmMixer] mixes with the glasses PCM.
+ * Output is 16 kHz mono s16le, fed to its own iFlytek session ("them" lane).
  */
 class PhoneMic(private val context: Context) {
 

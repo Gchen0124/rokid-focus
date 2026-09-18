@@ -71,9 +71,6 @@ class CxrHudController(
         sendReact = { drafts ->
             if (drafts.isNotEmpty()) send("react", *drafts.toTypedArray())
         },
-        sendHist = { lines ->
-            if (lines.isNotEmpty()) send("convo_hist", *lines.takeLast(6).toTypedArray())
-        },
         sendState = { state, msg -> send("listen_state", state, msg) },
         onPhoneMic = { line -> app.store.setLlmLine(line) },
     )

@@ -3,7 +3,9 @@ package com.chenniuniu.rokidfocus.glass.ui
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -148,7 +151,7 @@ fun GlassHud(
                     )
                 }
             }
-            if (!state.convoActive) {
+            if (!state.convoActive && !state.listenOn) {
                 TimeRings(now = now, modifier = Modifier.size(118.dp))
             }
         }
@@ -164,48 +167,22 @@ fun GlassHud(
                         .weight(1f)
                         .fillMaxWidth(),
                 ) {
-                    val who = state.convoWho
-                    val role = when {
-                        who == "you" -> "YOU"
-                        who.startsWith("them") && who.length > 4 -> "S${who.removePrefix("them")}"
-                        who.startsWith("them") -> "THEY"
-                        else -> "THEY"
-                    }
-                    val current = buildList {
-                        add("$role  ${state.convoLine}".trim())
-                        if (state.convoTrans.isNotBlank()) add("  ${state.convoTrans}")
-                    }
-                    val log = state.convoHist.filter { it.isNotBlank() } + current
-                    val lines = log.flatMap { wrapGlyphs(it, if (state.convoActive) 34 else 20) }
-                    val maxShow = 7
-                    val scroll = state.convoScroll.coerceIn(0, (lines.size - 1).coerceAtLeast(0))
-                    val end = (lines.size - scroll).coerceAtLeast(0)
-                    val start = (end - maxShow).coerceAtLeast(0)
-                    val window = if (end > start) lines.subList(start, end) else emptyList()
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth(),
-                    ) {
-                        if (scroll > 0) {
-                            Text(
-                                "◂ swipe  older",
-                                color = Dim,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                            )
-                        }
-                        window.forEachIndexed { i, line ->
-                            val newest = scroll == 0 && i == window.lastIndex
-                            Text(
-                                text = line,
-                                color = if (newest) Green else Mid,
-                                fontSize = if (newest) 16.sp else 13.sp,
-                                fontWeight = if (newest) FontWeight.Bold else FontWeight.Normal,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip,
-                                lineHeight = 18.sp,
+                    // Only the sentence being spoken / just spoken. Full history stays
+                    // in the phone app; the waveguide is a glance, not a log.
+                    val liveText = state.convoLine.trim()
+                    if (liveText.isNotBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth(),
+                        ) {
+                            TurnRow(
+                                Turn(
+                                    who = state.convoWho.ifBlank { "them" },
+                                    text = liveText,
+                                    trans = state.convoTrans.trim(),
+                                ),
+                                newest = true,
                             )
                         }
                     }
@@ -322,13 +299,13 @@ fun GlassHud(
                 color = Dim,
                 fontSize = 11.sp,
             )
-            Text(
-                if (state.convoActive) "swipe=history"
-                else if (state.showResults) "swipe=tasks"
-                else "swipe=results+cal",
-                color = Dim,
-                fontSize = 11.sp,
-            )
+            if (!state.convoActive) {
+                Text(
+                    if (state.showResults) "swipe=tasks" else "swipe=results+cal",
+                    color = Dim,
+                    fontSize = 11.sp,
+                )
+            }
             if (finished > 0) {
                 Spacer(Modifier.width(8.dp))
                 Text("$finished done", color = Mid, fontSize = 11.sp)
@@ -342,18 +319,59 @@ fun GlassHud(
 private val SlotKey = listOf("A", "B", "C")
 private val SlotTag = listOf("LEAN", "TURN", "SKIP")
 
-private fun wrapGlyphs(s: String, width: Int): List<String> {
-    if (s.isBlank()) return emptyList()
-    val out = ArrayList<String>()
-    var i = 0
-    while (i < s.length) {
-        val e = minOf(i + width, s.length)
-        out.add(s.substring(i, e))
-        i = e
-    }
-    return out
+/**
+ * One transcript turn. YOU (glasses mic) aligns left, THEY (phone mic) aligns
+ * right. The translation, when the speech was not the mother tongue, sits on
+ * the line under the original.
+ */
+private data class Turn(val who: String, val text: String, val trans: String)
+
+private fun roleLabel(who: String): String = when {
+    who == "you" -> "YOU"
+    who.startsWith("them") && who.length > 4 -> "S${who.removePrefix("them")}"
+    who.startsWith("them") -> "THEY"
+    else -> "THEY"
 }
 
+@Composable
+private fun TurnRow(turn: Turn, newest: Boolean) {
+    val fromThem = turn.who != "you"
+    val align = if (fromThem) TextAlign.End else TextAlign.Start
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (fromThem) Alignment.End else Alignment.Start,
+    ) {
+        Text(
+            text = "${roleLabel(turn.who)}  ${turn.text}",
+            color = if (newest) Green else Mid,
+            fontSize = if (newest) 16.sp else 13.sp,
+            fontWeight = if (newest) FontWeight.Bold else FontWeight.Normal,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = align,
+            lineHeight = if (newest) 18.sp else 15.sp,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (turn.trans.isNotBlank()) {
+            Text(
+                text = turn.trans,
+                color = if (newest) Cap else Dim,
+                fontSize = if (newest) 13.sp else 11.sp,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = align,
+                lineHeight = if (newest) 15.sp else 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 1.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
     val rolling = drafts.size == 1 && drafts[0] == "…"
@@ -387,7 +405,10 @@ private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
                 .background(if (on) SelectBg else SlotBg)
                 .padding(horizontal = 6.dp, vertical = 5.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     text = "$cursor [$key]",
                     color = if (on) SelectInk else Gold,
@@ -396,7 +417,7 @@ private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
                     fontFamily = FontFamily.Monospace,
                 )
                 val parts = line.split(" | ", limit = 2)
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).fillMaxWidth()) {
                     Text(
                         text = parts[0],
                         color = if (on) SelectInk else if (tag == "SKIP") Dim else Mid,
@@ -404,16 +425,24 @@ private fun ReactMenu(drafts: List<String>, pick: Int, pulse: Boolean) {
                         fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(),
                     )
                     if (parts.size > 1) {
                         Text(
                             text = parts[1],
                             color = if (on) SelectInk else Dim,
-                            fontSize = 12.sp,
+                            fontSize = if (on) 10.sp else 9.sp,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .basicMarquee(),
                         )
                     }
                 }

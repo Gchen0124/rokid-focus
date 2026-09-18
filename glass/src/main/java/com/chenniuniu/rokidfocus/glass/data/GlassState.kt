@@ -19,6 +19,7 @@ data class GlassState(
     val slogan: String = "怪奇实验室 + 外交官",
     val opportunities: List<Opportunity> = emptyList(),
     val convoActive: Boolean = false,
+    val listenOn: Boolean = false,
     val convoLine: String = "",
     val convoTrans: String = "",
     val convoPartial: Boolean = false,

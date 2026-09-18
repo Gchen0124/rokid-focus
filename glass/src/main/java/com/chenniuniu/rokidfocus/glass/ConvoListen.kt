@@ -36,7 +36,7 @@ class ConvoListen(
 
     fun start(notifyPhone: Boolean = true) {
         if (!running.compareAndSet(false, true)) return
-        store.update { it.copy(listenLine = "listen…", convoActive = false) }
+        store.update { it.copy(listenLine = "listen…", convoActive = false, listenOn = true) }
         if (store.snapshot().phoneLinked && bridge != null) {
             store.update { it.copy(listenLine = "phone") }
             if (notifyPhone) bridge.sendListen(true)
@@ -119,8 +119,10 @@ class ConvoListen(
         store.update {
             it.copy(
                 convoActive = false,
+                listenOn = false,
                 listenLine = "off",
                 convoLine = "",
+                convoTrans = "",
                 convoDrafts = emptyList(),
                 convoWho = "",
             )
@@ -144,6 +146,7 @@ class ConvoListen(
                 if (line.isBlank()) return
                 val definite = o.optBoolean("definite")
                 val who = classifyWho()
+                val trans = o.optString("trans").trim()
                 val remote = mutableListOf<String>()
                 o.optJSONArray("drafts")?.let { arr ->
                     for (i in 0 until arr.length()) {
@@ -151,7 +154,7 @@ class ConvoListen(
                         if (s.isNotEmpty()) remote.add(s)
                     }
                 }
-                showConvo(line, partial = !definite, who = who, remoteDrafts = remote)
+                showConvo(line, partial = !definite, who = who, remoteDrafts = remote, trans = trans)
                 if (definite) {
                     utterRms = 0.0
                     utterN = 0
@@ -217,7 +220,13 @@ class ConvoListen(
         if (bridge != null) bridge.sendPcm(chunk) else ws?.sendBinary(chunk)
     }
 
-    private fun showConvo(line: String, partial: Boolean, who: String, remoteDrafts: List<String> = emptyList()) {
+    private fun showConvo(
+        line: String,
+        partial: Boolean,
+        who: String,
+        remoteDrafts: List<String> = emptyList(),
+        trans: String = "",
+    ) {
         val drafts = when {
             partial -> emptyList()
             remoteDrafts.size == 1 && remoteDrafts[0] == "…" -> listOf("…")
@@ -228,7 +237,9 @@ class ConvoListen(
         store.update {
             it.copy(
                 convoActive = hideFocus,
+                listenOn = true,
                 convoLine = line,
+                convoTrans = trans,
                 convoPartial = partial,
                 convoWho = who,
                 convoDrafts = drafts,

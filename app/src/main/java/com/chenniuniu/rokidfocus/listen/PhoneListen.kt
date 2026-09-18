@@ -8,11 +8,18 @@ import com.chenniuniu.rokidfocus.BuildConfig
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Glasses PCM → iFlytek realtime LLM ASR (role_type=2). DeepSeek writes replies.
+ * Two-source listen, one iFlytek session per source.
+ *
+ *   glasses mic → lane "you"   (near-field wearer)
+ *   phone   mic → lane "them"  (phone held toward the other person)
+ *
+ * Source decides the label, so "who" is deterministic instead of a volume
+ * guess. Each lane streams iFlytek interim results to the HUD live and only
+ * commits + translates on a sentence end (type=0), which is the node where a
+ * sentence is sent to DeepSeek.
  */
 class PhoneListen(
     private val context: android.content.Context,
@@ -31,67 +38,48 @@ class PhoneListen(
     private val onLlm: (String) -> Unit = {},
     private val sendAsr: (text: String, who: String, trans: String) -> Unit,
     private val sendReact: (drafts: List<String>) -> Unit = {},
-    private val sendHist: (List<String>) -> Unit = {},
     private val sendState: (state: String, msg: String) -> Unit,
     private val onPhoneMic: (String) -> Unit = {},
 ) {
+    private inner class Lane(val who: String, val gate: Double) {
+        var asr: XfyunAsr? = null
+
+        @Volatile var open = false
+        val para = StringBuilder()
+        var live = ""
+        var gateOpen = false
+        var lastGateAt = 0L
+        var pcmCount = 0
+    }
+
     private val running = AtomicBoolean(false)
     private val pool = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
-    private var asr: XfyunAsr? = null
-    private var currentRl = 0
-    private var wearerRl = 0
+    private val you = Lane("you", GATE_YOU)
+    private val them = Lane("them", GATE_THEM)
     private var enrollBuf: java.io.ByteArrayOutputStream? = null
-    @Volatile private var asrOpen = false
-    private var utterRms = 0.0
-    private var utterN = 0
-    private var loudEma = 4000.0
-    private var pcmCount = 0
-    private var lastVoiceAt = 0L
-    private var lastKeepAt = 0L
     private val suggestGen = AtomicInteger(0)
     private var pendingThem: String = ""
-    private var pendingWho: String = "them"
-    private var lastPartial: String = ""
-    private var lastPartialWho: String = "them"
-    private val para = StringBuilder()
-    private var paraWho = ""
-    private var liveUtt = ""
-    private var lastTrans = ""
-    private var phonePcmCount = 0
+    private var displayedText: String = ""
     private var noKeySent = false
     private val phoneMic = PhoneMic(context)
-    private val mixer = PcmMixer { frame -> emitMixed(frame) }
 
     val isOn: Boolean get() = running.get()
 
     fun start() {
         main.removeCallbacks(noMicWatch)
-        main.removeCallbacks(keepAlive)
         main.removeCallbacks(suggestRun)
-        closeAsr()
+        closeLane(you)
+        closeLane(them)
         running.set(true)
-        utterRms = 0.0
-        utterN = 0
-        pcmCount = 0
-        asrOpen = false
-        pendingThem = ""
-        pendingWho = "them"
-        lastPartial = ""
-        lastPartialWho = "them"
-        para.clear()
-        paraWho = ""
-        liveUtt = ""
-        lastTrans = ""
-        currentRl = 0
-        wearerRl = 0
+        resetLane(you)
+        resetLane(them)
         enrollBuf = null
-        suggestGen.incrementAndGet()
-        phonePcmCount = 0
         noKeySent = false
+        displayedText = ""
+        suggestGen.incrementAndGet()
         memory.replace(seed())
         sendState("live", "phone")
-        mixer.start()
         startPhoneMic()
         main.postDelayed(noMicWatch, 5000)
         Log.i(TAG, "listen start")
@@ -108,84 +96,87 @@ class PhoneListen(
 
     fun stop() {
         main.removeCallbacks(noMicWatch)
-        main.removeCallbacks(keepAlive)
         main.removeCallbacks(suggestRun)
         suggestGen.incrementAndGet()
         pendingThem = ""
-        pendingWho = "them"
+        flushLane(you)
+        flushLane(them)
         running.set(false)
-        flushPara(keepListen = false)
         phoneMic.stop()
-        mixer.stop()
-        closeAsr()
+        closeLane(you)
+        closeLane(them)
+        onLive("", "", "")
         sendState("off", "")
         Log.i(TAG, "listen stop")
     }
 
+    /** Glasses PCM → "you" lane. */
     fun onPcm(data: ByteArray, sampleRate: Int, channels: Int) {
         if (!running.get()) return
         val rate = if (sampleRate <= 0) 16000 else sampleRate
         val pcm = toMono16k(data, rate, channels)
         if (pcm.isEmpty()) return
-        if (pcmCount == 0) {
+        if (you.pcmCount == 0) {
             Log.i(TAG, "first pcm rate=$sampleRate ch=$channels n=${data.size} rms=${rms(pcm, pcm.size).toInt()}")
             main.removeCallbacks(noMicWatch)
             sendState("live", "pcm")
         }
-        pcmCount++
+        you.pcmCount++
         enrollBuf?.write(pcm)
-        val rec = enrollBuf
-        if (rec != null && rec.size() >= ENROLL_BYTES) {
+        val recorder = enrollBuf
+        if (recorder != null && recorder.size() >= ENROLL_BYTES) {
             enrollBuf = null
-            val clip = rec.toByteArray()
+            val clip = recorder.toByteArray()
             pool.execute {
                 val (ok, msg) = XfyunVoicePrint.register(clip)
                 main.post { onEnroll(ok, msg) }
             }
         }
-        val r = rms(pcm, pcm.size)
-        val now = SystemClock.elapsedRealtime()
-        if (r >= RMS_VAD) {
-            lastVoiceAt = now
-            utterRms += r
-            utterN += 1
-            if (r > loudEma) loudEma = loudEma * 0.9 + r * 0.1
-        }
-        mixer.pushGlasses(boostFar(pcm, r))
-        lastKeepAt = now
+        if (!gate(you, rms(pcm, pcm.size))) return
+        feed(you, pcm)
     }
 
+    /** Phone PCM → "them" lane. */
     private fun onPhonePcm(pcm: ByteArray) {
         if (!running.get() || pcm.isEmpty()) return
-        if (phonePcmCount == 0) {
-            phonePcmCount++
-            main.removeCallbacks(noMicWatch)
+        if (them.pcmCount == 0) main.removeCallbacks(noMicWatch)
+        them.pcmCount++
+        if (!gate(them, rms(pcm, pcm.size))) return
+        feed(them, pcm)
+    }
+
+    /**
+     * Per-lane voice gate. Both lanes stay live at the same time — the wearer and
+     * the other person can overlap. Cross-mic echo is removed later by the
+     * you/them dedupe, not by muting a lane here.
+     */
+    private fun gate(lane: Lane, r: Double): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (r >= lane.gate) {
+            lane.gateOpen = true
+            lane.lastGateAt = now
+        } else if (now - lane.lastGateAt > GATE_HANG_MS) {
+            lane.gateOpen = false
         }
-        mixer.pushPhone(pcm)
+        return lane.gateOpen
     }
 
-    private fun emitMixed(frame: ByteArray) {
-        if (!running.get()) return
-        ensureAsr()
-        asr?.sendPcm(frame, last = false)
+    private fun feed(lane: Lane, pcm: ByteArray) {
+        ensureLane(lane)
+        lane.asr?.sendPcm(pcm, last = false)
     }
 
-    private val keepAlive = object : Runnable {
-        override fun run() {
-            if (!running.get() || !asrOpen) return
-            val now = SystemClock.elapsedRealtime()
-            lastKeepAt = now
-            main.postDelayed(this, KEEP_MS)
-        }
+    private fun resetLane(lane: Lane) {
+        lane.para.clear()
+        lane.live = ""
+        lane.gateOpen = false
+        lane.lastGateAt = 0L
+        lane.pcmCount = 0
     }
 
-    private val noMicWatch = Runnable {
-        if (running.get() && pcmCount == 0 && phonePcmCount == 0) sendState("err", "no mic")
-    }
-
-    private fun ensureAsr() {
-        if (asr != null) {
-            asrOpen = true
+    private fun ensureLane(lane: Lane) {
+        if (lane.asr != null) {
+            lane.open = true
             return
         }
         if (BuildConfig.XFYUN_APP_ID.isBlank() || BuildConfig.XFYUN_API_KEY.isBlank()) {
@@ -196,27 +187,29 @@ class PhoneListen(
             return
         }
         val session = XfyunAsr(
-            featureIds = voiceId(),
-            onText = { text, definite, speaker -> onAsr(text, definite, speaker) },
+            featureIds = if (lane === you) voiceId() else "",
+            onText = { text, definite, speaker -> onLaneText(lane, text, definite, speaker) },
             onFail = { err ->
-                Log.w(TAG, "xfyun $err")
-                asrOpen = false
-                asr = null
-                main.removeCallbacks(keepAlive)
+                Log.w(TAG, "xfyun ${lane.who} $err")
+                lane.open = false
+                lane.asr = null
                 if (running.get()) {
                     sendState("live", "rejoin")
-                    main.postDelayed({ if (running.get() && asr == null) ensureAsr() }, 500)
+                    main.postDelayed({ if (running.get() && lane.asr == null) ensureLane(lane) }, 500)
                 }
             },
             onReady = { sendState("live", "xfyun") },
         )
-        asr = session
-        asrOpen = true
-        lastKeepAt = SystemClock.elapsedRealtime()
+        lane.asr = session
+        lane.open = true
         session.connect()
-        main.removeCallbacks(keepAlive)
-        main.postDelayed(keepAlive, KEEP_MS)
-        Log.i(TAG, "xfyun session open")
+        Log.i(TAG, "xfyun ${lane.who} open")
+    }
+
+    private fun closeLane(lane: Lane) {
+        lane.open = false
+        lane.asr?.close()
+        lane.asr = null
     }
 
     fun beginEnroll() {
@@ -224,76 +217,79 @@ class PhoneListen(
         sendState("live", "enroll 12s")
     }
 
-    private fun closeAsr() {
-        asrOpen = false
-        main.removeCallbacks(keepAlive)
-        asr?.close()
-        asr = null
-    }
-
-    private fun onAsr(text: String, definite: Boolean, speaker: Int = 0) {
+    private fun onLaneText(lane: Lane, text: String, definite: Boolean, speaker: Int) {
         val line = text.trim()
         if (line.isBlank() || !running.get()) return
-        if (speaker > 0 && currentRl > 0 && speaker != currentRl) {
-            flushPara(keepListen = true)
-        }
-        if (speaker > 0) currentRl = speaker
-        val who = whoFor(currentRl)
-        if (paraWho.isNotBlank() && who != paraWho) flushPara(keepListen = true)
-        paraWho = who
-        lastPartial = line
-        lastPartialWho = who
+        val who = if (lane === you) "you" else if (speaker > 1) "them$speaker" else "them"
         if (definite) {
-            appendClause(line)
-            liveUtt = ""
-            val t = shownText()
-            memory.add(who, t)
-            onTurn(who, t)
-            if (Lang.needsTrans(t, nativeLang())) {
-                val key = llmKey()
-                val native = nativeLang()
-                pool.execute {
-                    val zh = Drafts.translate(t, native, key)
-                    if (zh.isNotBlank() && running.get()) {
-                        lastTrans = zh
-                        onTrans(zh)
-                        main.post { pushTranscript() }
-                    }
-                }
-            } else {
-                lastTrans = ""
+            appendClause(lane, line)
+            lane.live = ""
+            val t = shownText(lane)
+            if (t.isNotBlank()) {
+                memory.add(who, t)
+                onLog(memory.snapshot())
+                onTurn(who, t)
+                show(who, t, "")
+                if (who != "you") scheduleSuggest(t, who)
+                translateTurn(who, t)
             }
-            if (who != "you") scheduleSuggest(t, who)
+            // Sentence committed: start the next one fresh instead of re-sending
+            // the whole accumulated paragraph on every iFlytek type=0.
+            lane.para.clear()
         } else {
-            liveUtt = line
+            // Interim: show the sentence growing word by word, no translation yet.
+            lane.live = line
+            show(who, shownText(lane), "")
         }
-        pushTranscript()
     }
 
-    private fun appendClause(text: String) {
+    /** The single line the glasses see. History stays on the phone. */
+    private fun show(who: String, text: String, trans: String) {
+        if (text.isBlank()) return
+        displayedText = text
+        onLive(who, text, trans)
+        sendAsr(text.takeLast(500), who, trans)
+    }
+
+    /** Sentence end → DeepSeek translation, then update the same line on the glasses. */
+    private fun translateTurn(who: String, text: String) {
+        if (!Lang.needsTrans(text, nativeLang())) return
+        val key = llmKey()
+        val native = nativeLang()
+        pool.execute {
+            val out = Drafts.translate(text, native, key)
+            if (out.isNotBlank() && running.get()) {
+                memory.setTrans(text, out)
+                onTrans(out)
+                main.post { if (displayedText == text) show(who, text, out) }
+            }
+        }
+    }
+
+    private fun appendClause(lane: Lane, text: String) {
         val t = text.trim()
         if (t.isBlank()) return
-        val cur = para.toString()
+        val cur = lane.para.toString()
         when {
-            cur.isEmpty() -> para.append(t)
+            cur.isEmpty() -> lane.para.append(t)
             t.startsWith(cur) -> {
-                para.clear()
-                para.append(t)
+                lane.para.clear()
+                lane.para.append(t)
             }
             cur.endsWith(t) -> { }
             cur.contains(t) && t.length < cur.length / 2 -> { }
             else -> {
                 val last = cur.last()
-                if (last !in "。？！、，,.!?;； ") para.append(" ")
-                para.append(t)
+                if (last !in "。？！、，,.!?;； ") lane.para.append(" ")
+                lane.para.append(t)
             }
         }
-        if (para.length > 2000) para.delete(0, para.length - 1800)
+        if (lane.para.length > 2000) lane.para.delete(0, lane.para.length - 1800)
     }
 
-    private fun shownText(): String {
-        val body = para.toString()
-        val live = liveUtt.trim()
+    private fun shownText(lane: Lane): String {
+        val body = lane.para.toString()
+        val live = lane.live.trim()
         return when {
             live.isBlank() -> body
             body.isBlank() -> live
@@ -303,29 +299,19 @@ class PhoneListen(
         }
     }
 
-    private fun pushTranscript() {
-        val who = paraWho.ifBlank { lastPartialWho }
-        val text = shownText()
-        onLive(who, text, lastTrans)
-        sendAsr(text.takeLast(500), who, lastTrans)
-        sendHist(memory.hudLines(6))
+    private fun flushLane(lane: Lane) {
+        val t = shownText(lane).trim()
+        if (t.isNotBlank()) {
+            memory.add(lane.who, t)
+            onLog(memory.snapshot())
+            onTurn(lane.who, t)
+        }
+        lane.para.clear()
+        lane.live = ""
     }
 
-    private fun flushPara(keepListen: Boolean) {
-        val t = shownText().trim()
-        val who = paraWho.ifBlank { lastPartialWho }
-        if (t.isNotBlank()) {
-            memory.add(who, t)
-            onLog(memory.snapshot())
-            onTurn(who, t)
-            sendHist(memory.hudLines(6))
-            if (who != "you") scheduleSuggest(t, who)
-            Log.i(TAG, "flush $who ${t.take(80)}")
-        }
-        para.clear()
-        liveUtt = ""
-        paraWho = ""
-        if (!keepListen) onLive("", "", "")
+    private val noMicWatch = Runnable {
+        if (running.get() && you.pcmCount == 0 && them.pcmCount == 0) sendState("err", "no mic")
     }
 
     private val suggestRun = Runnable {
@@ -353,53 +339,17 @@ class PhoneListen(
 
     private fun scheduleSuggest(line: String, who: String) {
         pendingThem = line
-        pendingWho = who
         suggestGen.incrementAndGet()
         main.removeCallbacks(suggestRun)
         main.postDelayed(suggestRun, SUGGEST_DEBOUNCE_MS)
     }
 
-    private fun whoFor(rl: Int): String {
-        val vol = classifyWho()
-        if (vol == "you" && rl > 0 && wearerRl == 0) wearerRl = rl
-        if (wearerRl > 0 && rl > 0) {
-            if (rl == wearerRl) return "you"
-            return if (rl == 1) "them" else "them$rl"
-        }
-        if (vol == "you") return "you"
-        return if (rl > 1) "them$rl" else "them"
-    }
-
-    private fun boostFar(pcm: ByteArray, rms: Double): ByteArray {
-        if (rms < 60.0 || rms >= FAR_TARGET) return pcm
-        val gain = (FAR_TARGET / rms).coerceAtMost(FAR_GAIN_MAX)
-        val out = ByteArray(pcm.size)
-        var i = 0
-        while (i + 1 < pcm.size) {
-            val v = (pcm[i].toInt() and 0xff) or (pcm[i + 1].toInt() shl 8)
-            val sample = if (v > 32767) v - 65536 else v
-            val boosted = (sample * gain).toInt().coerceIn(-32767, 32767)
-            out[i] = (boosted and 0xff).toByte()
-            out[i + 1] = ((boosted shr 8) and 0xff).toByte()
-            i += 2
-        }
-        return out
-    }
-
-    private fun classifyWho(): String {
-        val avg = if (utterN > 0) utterRms / utterN else 0.0
-        val youCut = max(2200.0, loudEma * 0.55)
-        return if (avg >= youCut) "you" else "them"
-    }
-
     companion object {
         private const val TAG = "PhoneListen"
-        private const val RMS_VAD = 180.0
-        private const val RMS_YOU = 3500.0
-        private const val KEEP_MS = 250L
+        private const val GATE_YOU = 350.0
+        private const val GATE_THEM = 200.0
+        private const val GATE_HANG_MS = 600L
         private const val SUGGEST_DEBOUNCE_MS = 280L
-        private const val FAR_TARGET = 3200.0
-        private const val FAR_GAIN_MAX = 12.0
         private const val ENROLL_BYTES = 16000 * 2 * 12
 
         fun isIdleTimeout(err: String): Boolean {

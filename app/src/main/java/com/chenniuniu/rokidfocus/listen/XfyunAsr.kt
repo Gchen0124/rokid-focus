@@ -204,7 +204,11 @@ class XfyunAsr(
             onFail(payload.optString("desc").ifBlank { "xfyun" }.take(40))
             return
         }
-        val st = payload.optJSONObject("cn")?.optJSONObject("st") ?: return
+        val st = findSt(payload)
+        if (st == null) {
+            Log.i(TAG, "no st keys=${keysOf(payload)}")
+            return
+        }
         val type = st.optString("type").ifBlank { st.optInt("type", 1).toString() }
         val definite = type == "0"
         val (text, rl) = readWords(st)
@@ -212,6 +216,29 @@ class XfyunAsr(
             Log.i(TAG, "asr def=$definite rl=$rl $text")
             onText(text, definite, rl)
         }
+    }
+
+    /**
+     * iFlytek may key the transcript by language (`cn`, `en`, …). Prefer the
+     * source-language nodes, then fall back to any object that carries `st`.
+     */
+    private fun findSt(payload: JSONObject): JSONObject? {
+        for (key in listOf("cn", "en", "ko", "ja")) {
+            payload.optJSONObject(key)?.optJSONObject("st")?.let { return it }
+        }
+        val keys = payload.keys()
+        while (keys.hasNext()) {
+            val o = payload.optJSONObject(keys.next()) ?: continue
+            o.optJSONObject("st")?.let { return it }
+        }
+        return null
+    }
+
+    private fun keysOf(payload: JSONObject): List<String> {
+        val out = mutableListOf<String>()
+        val keys = payload.keys()
+        while (keys.hasNext()) out.add(keys.next())
+        return out
     }
 
     private fun readWords(st: JSONObject): Pair<String, Int> {

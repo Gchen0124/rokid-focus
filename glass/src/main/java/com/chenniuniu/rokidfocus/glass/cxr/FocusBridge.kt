@@ -85,7 +85,7 @@ class FocusBridge(private val store: GlassStore) {
                         "err" -> shortErr(msg)
                         else -> st.ifBlank { "live" }
                     }
-                    store.update { it.copy(listenLine = line) }
+                    store.update { it.copy(listenLine = line, listenOn = st != "off") }
                     if (st == "off") clearConvo()
                 }
                 "asr" -> applyAsr(
@@ -161,6 +161,7 @@ class FocusBridge(private val store: GlassStore) {
         store.update {
             it.copy(
                 convoActive = false,
+                listenOn = false,
                 convoLine = "",
                 convoTrans = "",
                 convoDrafts = emptyList(),
@@ -177,6 +178,7 @@ class FocusBridge(private val store: GlassStore) {
         store.update {
             it.copy(
                 convoActive = true,
+                listenOn = true,
                 convoLine = line,
                 convoTrans = trans,
                 convoPartial = !definite,

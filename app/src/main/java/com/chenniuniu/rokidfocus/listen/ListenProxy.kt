@@ -86,13 +86,26 @@ class ListenProxy(private val context: Context, private val onBind: (String) -> 
                     if (definite) {
                         pool.execute {
                             val app = runCatching { context.applicationContext as com.chenniuniu.rokidfocus.FocusApplication }.getOrNull()
+                            val native = app?.store?.snapshot()?.nativeLang ?: "zh"
+                            val key = app?.store?.replyKey().orEmpty()
+                            val trans = if (app != null && Lang.needsTrans(text, native)) {
+                                Drafts.translate(text, native, key)
+                            } else {
+                                ""
+                            }
                             app?.convo?.add(who, text)
-                            app?.store?.appendConvo(who, text)
+                            app?.store?.appendConvo(who, text, trans)
+                            if (trans.isNotBlank()) {
+                                app?.store?.setLastTrans(trans)
+                                o.put("trans", trans)
+                            }
                             val result = Drafts.fromConvo(
                                 convo = app?.convo?.prompt().orEmpty(),
                                 lastThem = text,
                                 style = app?.store?.snapshot()?.talkStyle.orEmpty(),
-                                apiKey = app?.store?.replyKey().orEmpty(),
+                                apiKey = key,
+                                optionMode = Lang.optionMode(text, native),
+                                native = native,
                             )
                             app?.store?.setLlmLine(result.status)
                             if (result.replies.isNotEmpty()) {

@@ -134,7 +134,15 @@ class FocusStore(context: Context) {
         val t = text.trim()
         if (t.isBlank()) return
         val cur = _state.value.convoTurns.toMutableList()
-        val last = cur.lastOrNull()
+        var last = cur.lastOrNull()
+        if (last != null && last.who != who &&
+            System.currentTimeMillis() - last.at < com.chenniuniu.rokidfocus.listen.ECHO_DEDUPE_WINDOW_MS &&
+            com.chenniuniu.rokidfocus.listen.isEcho(last.text, t)
+        ) {
+            if (who == "them") return
+            cur.removeAt(cur.lastIndex)
+            last = cur.lastOrNull()
+        }
         if (last != null && last.who == who) {
             val merged = if (t.startsWith(last.text)) t else (last.text + " " + t).trim()
             cur[cur.lastIndex] = last.copy(
