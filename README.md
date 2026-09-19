@@ -43,6 +43,7 @@ See [`docs/LISTEN.md`](docs/LISTEN.md) for the ASR/translation/reaction rules an
 | `app/` | Phone app: Desk / Convo / Listen UI, CXR link, iFlytek ASR, DeepSeek |
 | `glass/` | Glasses app: HUD, mic recording, temple gestures, chimes |
 | `docs/LISTEN.md` | **Conversation pipeline source of truth** |
+| `docs/AGENT.md` | Design: voice-invoked personal agent (Hermes), Agent tab, image handling |
 | `docs/RESEARCH-extensions.md` | Research: select-to-speak, agent (Hermes) integration, inline term lookup |
 | `docs/DESIGN.md`, `docs/GLASS.md` | Earlier Focus HUD notes |
 | `mock/` | Mac cockpit (HTML + `server.py`) for the priority list |
