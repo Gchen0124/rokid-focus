@@ -5,6 +5,10 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.chenniuniu.rokidfocus.agent.AgentClient
+import com.chenniuniu.rokidfocus.agent.AgentMessage
+import com.chenniuniu.rokidfocus.agent.HermesDirectClient
+import com.chenniuniu.rokidfocus.agent.MockAgentClient
 import com.chenniuniu.rokidfocus.clock.ChimeKind
 import com.chenniuniu.rokidfocus.clock.WallClock
 import com.chenniuniu.rokidfocus.data.FocusState
@@ -164,7 +168,90 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         previewPlayer.play(kind)
     }
 
+    // ---- Agent tab -------------------------------------------------------
+
+    private var agentClient: AgentClient? = null
+
+    fun askAgent(prompt: String) {
+        val clean = prompt.trim()
+        if (clean.isBlank() || app.store.snapshot().agentBusy) return
+        val snap = app.store.snapshot()
+        val history = snap.agentMessages
+        app.store.setAgentMessages(history + AgentMessage(role = "user", text = clean))
+        app.store.setAgentLive("")
+        app.store.setAgentLine("")
+        app.store.setAgentBusy(true)
+
+        val client = buildClient(snap)
+        agentClient = client
+        val acc = StringBuilder()
+        val images = mutableListOf<String>()
+        client.ask(
+            history = history,
+            prompt = clean,
+            images = emptyList(),
+            onDelta = { delta ->
+                acc.append(delta)
+                app.store.setAgentLive(acc.toString())
+                app.glasses.agentDelta(acc.toString())
+            },
+            onImage = { url ->
+                if (images.none { it == url }) images.add(url)
+                app.glasses.agentImage()
+            },
+            onDone = {
+                app.glasses.agentDone()
+                val text = acc.toString().trim()
+                if (text.isNotBlank() || images.isNotEmpty()) {
+                    app.store.setAgentMessages(
+                        app.store.snapshot().agentMessages +
+                            AgentMessage(role = "agent", text = text, images = images.toList()),
+                    )
+                }
+                app.store.setAgentLive("")
+                app.store.setAgentBusy(false)
+            },
+            onError = { err ->
+                app.store.setAgentMessages(
+                    app.store.snapshot().agentMessages + AgentMessage(role = "agent", text = "⚠ $err"),
+                )
+                app.store.setAgentLive("")
+                app.store.setAgentBusy(false)
+                app.store.setAgentLine(err)
+            },
+        )
+    }
+
+    fun cancelAgent() {
+        agentClient?.cancel()
+        app.store.setAgentBusy(false)
+        app.store.setAgentLive("")
+    }
+
+    fun clearAgent() {
+        agentClient?.cancel()
+        app.store.setAgentMessages(emptyList())
+        app.store.setAgentLive("")
+        app.store.setAgentBusy(false)
+        app.store.setAgentLine("")
+    }
+
+    fun setAgentBackend(value: String) = app.store.setAgentBackend(value)
+    fun setAgentUrl(value: String) = app.store.setAgentUrl(value)
+    fun setAgentKey(value: String) = app.store.setAgentKey(value)
+    fun setAgentModel(value: String) = app.store.setAgentModel(value)
+
+    private fun buildClient(snap: FocusState): AgentClient {
+        val key = app.store.agentKey()
+        return if (snap.agentBackend == "hermes" && snap.agentUrl.isNotBlank() && key.isNotBlank()) {
+            HermesDirectClient(snap.agentUrl, key, snap.agentModel)
+        } else {
+            MockAgentClient()
+        }
+    }
+
     override fun onCleared() {
+        agentClient?.cancel()
         previewPlayer.release()
         super.onCleared()
     }

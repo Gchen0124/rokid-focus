@@ -156,6 +156,42 @@ fun GlassHud(
             }
         }
 
+        if (state.agentActive) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .background(SlotBg)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    "AGENT",
+                    color = Gold,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                )
+                if (state.agentLine.isNotBlank()) {
+                    Text(
+                        state.agentLine,
+                        color = Cap,
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (state.agentImg) {
+                    Text(
+                        "image · phone",
+                        color = Dim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            }
+        }
+
         if (state.convoActive) {
             Column(
                 modifier = Modifier

@@ -199,6 +199,19 @@ class CxrHudController(
         if (listen.isOn) stopListen() else startListen()
     }
 
+    fun agentDelta(text: String) {
+        if (text.isBlank()) return
+        send("agent_stream", "agent", text.takeLast(400))
+    }
+
+    fun agentImage() {
+        send("agent_img", "1")
+    }
+
+    fun agentDone() {
+        send("agent_done")
+    }
+
     fun beginVoiceEnroll() {
         if (!listen.isOn) startListen()
         app.store.setEnrollLine("speak 12s into the glasses")

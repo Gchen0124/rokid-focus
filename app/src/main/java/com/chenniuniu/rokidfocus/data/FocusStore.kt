@@ -25,6 +25,11 @@ class FocusStore(context: Context) {
             llmLine = if (replyKeyFromPrefs().isNotBlank()) "DeepSeek ready" else "Paste DeepSeek key for replies",
             convoTurns = com.chenniuniu.rokidfocus.listen.ConvoTurn.fromJson(prefs.getString(KEY_CONVO, null)),
             voiceEnrolled = prefs.getString(KEY_VP, "").orEmpty().isNotBlank(),
+            agentMessages = com.chenniuniu.rokidfocus.agent.AgentMessage.fromJson(prefs.getString(KEY_AGENT_MSGS, null)),
+            agentBackend = prefs.getString(KEY_AGENT_BACKEND, "mock") ?: "mock",
+            agentUrl = prefs.getString(KEY_AGENT_URL, "").orEmpty(),
+            agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes") ?: "hermes",
+            agentKeySet = agentKeyFromPrefs().isNotBlank(),
         )
     )
     val state: StateFlow<FocusState> = _state.asStateFlow()
@@ -237,6 +242,56 @@ class FocusStore(context: Context) {
         _state.update(transform)
     }
 
+    // ---- Agent tab -------------------------------------------------------
+
+    fun agentKey(): String = agentKeyFromPrefs()
+
+    private fun agentKeyFromPrefs(): String =
+        prefs.getString(KEY_AGENT_KEY, "")?.trim().orEmpty()
+
+    fun setAgentKey(value: String) {
+        val clean = value.trim()
+        prefs.edit().putString(KEY_AGENT_KEY, clean).apply()
+        _state.update { it.copy(agentKeySet = clean.isNotBlank()) }
+    }
+
+    fun setAgentBackend(value: String) {
+        val clean = if (value == "hermes") "hermes" else "mock"
+        prefs.edit().putString(KEY_AGENT_BACKEND, clean).apply()
+        _state.update { it.copy(agentBackend = clean) }
+    }
+
+    fun setAgentUrl(value: String) {
+        val clean = value.trim().trimEnd('/')
+        prefs.edit().putString(KEY_AGENT_URL, clean).apply()
+        _state.update { it.copy(agentUrl = clean) }
+    }
+
+    fun setAgentModel(value: String) {
+        val clean = value.trim().ifBlank { "hermes" }
+        prefs.edit().putString(KEY_AGENT_MODEL, clean).apply()
+        _state.update { it.copy(agentModel = clean) }
+    }
+
+    fun setAgentMessages(items: List<com.chenniuniu.rokidfocus.agent.AgentMessage>) {
+        prefs.edit()
+            .putString(KEY_AGENT_MSGS, com.chenniuniu.rokidfocus.agent.AgentMessage.toJson(items))
+            .apply()
+        _state.update { it.copy(agentMessages = items) }
+    }
+
+    fun setAgentLive(text: String) {
+        _state.update { it.copy(agentLive = text) }
+    }
+
+    fun setAgentBusy(busy: Boolean) {
+        _state.update { it.copy(agentBusy = busy) }
+    }
+
+    fun setAgentLine(line: String) {
+        _state.update { it.copy(agentLine = line) }
+    }
+
     companion object {
         private const val PREFS = "rokid_focus"
         private const val KEY_PRIORITY = "priority"
@@ -250,6 +305,11 @@ class FocusStore(context: Context) {
         private const val KEY_REPLY = "deepseek_reply_key"
         private const val KEY_CONVO = "convo_history_json"
         private const val KEY_VP = "xfyun_feature_id"
+        private const val KEY_AGENT_MSGS = "agent_messages_json"
+        private const val KEY_AGENT_BACKEND = "agent_backend"
+        private const val KEY_AGENT_URL = "agent_url"
+        private const val KEY_AGENT_KEY = "agent_key"
+        private const val KEY_AGENT_MODEL = "agent_model"
         const val DEFAULT_SYNC = "http://192.168.1.24:8787"
         const val DEFAULT_SLOGAN = "怪奇实验室 + 外交官"
         const val DEFAULT_TALK = "怪奇实验室 + 外交官"

@@ -68,6 +68,7 @@ fun FocusScreen(
             FilterChip(selected = tab == "swipe", onClick = { tab = "swipe" }, label = { Text("Swipe") })
             FilterChip(selected = tab == "desk", onClick = { tab = "desk" }, label = { Text("Desk") })
             FilterChip(selected = tab == "convo", onClick = { tab = "convo" }, label = { Text("Convo") })
+            FilterChip(selected = tab == "agent", onClick = { tab = "agent" }, label = { Text("Agent") })
             Spacer(Modifier.weight(1f))
             Text(state.syncLine, style = MaterialTheme.typography.bodySmall)
         }
@@ -78,6 +79,13 @@ fun FocusScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(top = 8.dp),
+            )
+        } else if (tab == "agent") {
+            AgentScreen(
+                viewModel = viewModel,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
         } else if (tab == "convo") {
             ConvoHistory(

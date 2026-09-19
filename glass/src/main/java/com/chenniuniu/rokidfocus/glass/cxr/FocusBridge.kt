@@ -114,6 +114,18 @@ class FocusBridge(private val store: GlassStore) {
                 "convo_hist" -> store.update {
                     it.copy(convoHist = fields.drop(1).filter { line -> line.isNotBlank() })
                 }
+                "agent_stream" -> {
+                    val text = fields.getOrNull(2).orEmpty()
+                    store.update {
+                        it.copy(agentActive = true, agentLine = text.takeLast(400), agentImg = it.agentImg)
+                    }
+                    scheduleAgentClear()
+                }
+                "agent_img" -> {
+                    store.update { it.copy(agentActive = true, agentImg = true) }
+                    scheduleAgentClear()
+                }
+                "agent_done" -> scheduleAgentClear()
             }
         }
     }
@@ -154,6 +166,17 @@ class FocusBridge(private val store: GlassStore) {
         } finally {
             pcmGate.set(false)
         }
+    }
+
+    private var agentHide: Runnable? = null
+
+    private fun scheduleAgentClear() {
+        agentHide?.let { main.removeCallbacks(it) }
+        val hide = Runnable {
+            store.update { it.copy(agentActive = false, agentLine = "", agentImg = false) }
+        }
+        agentHide = hide
+        main.postDelayed(hide, AGENT_HIDE_MS)
     }
 
     fun clearConvo() {
@@ -215,6 +238,7 @@ class FocusBridge(private val store: GlassStore) {
         const val CLIENT_KEY = "rk_custom_client"
         const val CMD_KEY = "rk_custom_key"
         private const val HIDE_AFTER_MS = 8000L
+        private const val AGENT_HIDE_MS = 15000L
 
         private fun shortErr(msg: String): String {
             val s = msg.lowercase()

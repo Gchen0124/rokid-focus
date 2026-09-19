@@ -1,5 +1,6 @@
 package com.chenniuniu.rokidfocus.data
 
+import com.chenniuniu.rokidfocus.agent.AgentMessage
 import com.chenniuniu.rokidfocus.clock.ChimeKind
 import com.chenniuniu.rokidfocus.glasses.GlassesStatus
 import com.chenniuniu.rokidfocus.listen.ConvoTurn
@@ -33,4 +34,12 @@ data class FocusState(
     val llmLine: String = "",
     val voiceEnrolled: Boolean = false,
     val enrollLine: String = "",
+    val agentMessages: List<AgentMessage> = emptyList(),
+    val agentLive: String = "",
+    val agentBusy: Boolean = false,
+    val agentBackend: String = "mock",
+    val agentUrl: String = "",
+    val agentModel: String = "hermes",
+    val agentKeySet: Boolean = false,
+    val agentLine: String = "",
 )
