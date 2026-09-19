@@ -42,4 +42,5 @@ data class FocusState(
     val agentModel: String = "hermes",
     val agentKeySet: Boolean = false,
     val agentLine: String = "",
+    val speakLine: String = "",
 )

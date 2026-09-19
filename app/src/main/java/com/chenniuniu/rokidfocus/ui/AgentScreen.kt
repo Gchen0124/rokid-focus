@@ -88,9 +88,15 @@ fun AgentScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            state.agentMessages.forEach { m -> AgentBubbleRow(m) { zoom = it } }
+            state.agentMessages.forEach { m ->
+                AgentBubbleRow(m, onZoom = { zoom = it }, onSpeak = { viewModel.speak(it) })
+            }
             if (state.agentLive.isNotBlank()) {
-                AgentBubbleRow(AgentMessage(role = "agent", text = state.agentLive, done = false)) { zoom = it }
+                AgentBubbleRow(
+                    AgentMessage(role = "agent", text = state.agentLive, done = false),
+                    onZoom = { zoom = it },
+                    onSpeak = { viewModel.speak(it) },
+                )
             }
         }
 
@@ -189,7 +195,7 @@ private fun AgentConfig(viewModel: FocusViewModel) {
 }
 
 @Composable
-private fun AgentBubbleRow(m: AgentMessage, onZoom: (String) -> Unit) {
+private fun AgentBubbleRow(m: AgentMessage, onZoom: (String) -> Unit, onSpeak: (String) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (m.fromUser) Arrangement.End else Arrangement.Start,
@@ -220,6 +226,9 @@ private fun AgentBubbleRow(m: AgentMessage, onZoom: (String) -> Unit) {
             }
             if (!m.done && m.text.isBlank()) {
                 Text("…", color = AgentInk, style = MaterialTheme.typography.bodyLarge)
+            }
+            if (!m.fromUser && m.done && m.text.isNotBlank()) {
+                TextButton(onClick = { onSpeak(m.text) }) { Text("Speak") }
             }
         }
     }

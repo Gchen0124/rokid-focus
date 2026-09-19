@@ -1,6 +1,7 @@
 package com.chenniuniu.rokidfocus.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +97,8 @@ fun FocusScreen(
                 llmLine = state.llmLine,
                 listenLive = state.listenLive,
                 onClear = { viewModel.clearConvo() },
+                onSpeak = { viewModel.speak(it) },
+                speakLine = state.speakLine,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -324,6 +327,8 @@ private fun ConvoHistory(
     llmLine: String,
     listenLive: Boolean,
     onClear: () -> Unit,
+    onSpeak: (String) -> Unit,
+    speakLine: String,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -349,6 +354,9 @@ private fun ConvoHistory(
             },
             style = MaterialTheme.typography.bodySmall,
         )
+        if (speakLine.isNotBlank()) {
+            Text(speakLine, style = MaterialTheme.typography.bodySmall)
+        }
         if (turns.isEmpty() && liveText.isBlank()) {
             Text("Nothing yet. Connect glasses, listen, talk.", style = MaterialTheme.typography.bodyMedium)
         }
@@ -389,7 +397,7 @@ private fun ConvoHistory(
                             Text(turn.trans, style = MaterialTheme.typography.bodyMedium)
                         }
                         if (turn.replies.isNotEmpty()) {
-                            ReplyRack(turn.replies)
+                            ReplyRack(turn.replies, onSpeak)
                         }
                     }
                 }
@@ -407,7 +415,7 @@ private val SlotGold = Color(0xFFFFE08A)
 private val SlotDim = Color(0xFF3D7A58)
 
 @Composable
-private fun ReplyRack(replies: List<String>) {
+private fun ReplyRack(replies: List<String>, onSpeak: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -416,6 +424,7 @@ private fun ReplyRack(replies: List<String>) {
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        Text("tap to speak", color = SlotDim, fontSize = 11.sp)
         replies.take(3).forEachIndexed { i, line ->
             val key = SlotKey.getOrElse(i) { "${i + 1}" }
             val tag = if (line.equals("skip", true)) "SKIP" else SlotTag.getOrElse(i) { "SAY" }
@@ -425,6 +434,10 @@ private fun ReplyRack(replies: List<String>) {
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = tag != "SKIP") { onSpeak(line) }
+                    .padding(vertical = 2.dp),
             )
         }
     }

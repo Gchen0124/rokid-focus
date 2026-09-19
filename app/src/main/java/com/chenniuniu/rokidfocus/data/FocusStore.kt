@@ -292,6 +292,10 @@ class FocusStore(context: Context) {
         _state.update { it.copy(agentLine = line) }
     }
 
+    fun setSpeakLine(line: String) {
+        _state.update { it.copy(speakLine = line) }
+    }
+
     companion object {
         private const val PREFS = "rokid_focus"
         private const val KEY_PRIORITY = "priority"

@@ -12,7 +12,9 @@ import com.chenniuniu.rokidfocus.agent.MockAgentClient
 import com.chenniuniu.rokidfocus.clock.ChimeKind
 import com.chenniuniu.rokidfocus.clock.WallClock
 import com.chenniuniu.rokidfocus.data.FocusState
+import com.chenniuniu.rokidfocus.listen.Lang
 import com.chenniuniu.rokidfocus.sound.ChimePlayer
+import com.chenniuniu.rokidfocus.speak.TtsSpeaker
 import com.chenniuniu.rokidfocus.data.TaskSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -241,6 +243,24 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     fun setAgentKey(value: String) = app.store.setAgentKey(value)
     fun setAgentModel(value: String) = app.store.setAgentModel(value)
 
+    // ---- Speak for me (嘴替) ---------------------------------------------
+
+    private val speaker by lazy { TtsSpeaker(app) }
+
+    /** Speaks [text] aloud through the phone / Bluetooth media route. */
+    fun speak(text: String) {
+        val t = text.trim()
+        if (t.isBlank() || t.equals("skip", true)) return
+        val lang = Lang.detect(t)
+        speaker.speak(t, lang)
+        app.store.setSpeakLine("speaking · $lang")
+    }
+
+    fun stopSpeak() {
+        speaker.stop()
+        app.store.setSpeakLine("")
+    }
+
     private fun buildClient(snap: FocusState): AgentClient {
         val key = app.store.agentKey()
         return if (snap.agentBackend == "hermes" && snap.agentUrl.isNotBlank() && key.isNotBlank()) {
@@ -252,6 +272,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         agentClient?.cancel()
+        speaker.shutdown()
         previewPlayer.release()
         super.onCleared()
     }
