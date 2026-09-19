@@ -46,7 +46,6 @@ class PhoneListen(
 
         @Volatile var open = false
         val para = StringBuilder()
-        var live = ""
         var gateOpen = false
         var lastGateAt = 0L
         var pcmCount = 0
@@ -168,7 +167,6 @@ class PhoneListen(
 
     private fun resetLane(lane: Lane) {
         lane.para.clear()
-        lane.live = ""
         lane.gateOpen = false
         lane.lastGateAt = 0L
         lane.pcmCount = 0
@@ -187,7 +185,10 @@ class PhoneListen(
             return
         }
         val session = XfyunAsr(
-            featureIds = if (lane === you) voiceId() else "",
+            featureIds = "",
+            // The phone may hear several people talking to the wearer, so it needs
+            // blind speaker separation. The glasses mic is only the wearer.
+            roleType = if (lane === them) ROLE_SEPARATION else 0,
             onText = { text, definite, speaker -> onLaneText(lane, text, definite, speaker) },
             onFail = { err ->
                 Log.w(TAG, "xfyun ${lane.who} $err")
@@ -221,11 +222,11 @@ class PhoneListen(
         val line = text.trim()
         if (line.isBlank() || !running.get()) return
         val who = if (lane === you) "you" else if (speaker > 1) "them$speaker" else "them"
+        appendClause(lane, line)
+        val t = lane.para.toString().trim()
         if (definite) {
-            appendClause(lane, line)
-            lane.live = ""
-            val t = shownText(lane)
             if (t.isNotBlank()) {
+                Log.i(TAG, "${lane.who} FINAL ${SystemClock.elapsedRealtime()} $t")
                 memory.add(who, t)
                 onLog(memory.snapshot())
                 onTurn(who, t)
@@ -238,8 +239,8 @@ class PhoneListen(
             lane.para.clear()
         } else {
             // Interim: show the sentence growing word by word, no translation yet.
-            lane.live = line
-            show(who, shownText(lane), "")
+            Log.i(TAG, "${lane.who} part  ${SystemClock.elapsedRealtime()} $t")
+            show(who, t, "")
         }
     }
 
@@ -266,48 +267,43 @@ class PhoneListen(
         }
     }
 
+    /**
+     * Merge an iFlytek segment into the lane's current sentence. Intermediate
+     * results may be cumulative (grow from the start) or incremental (only the
+     * new tail), so handle both without dropping words.
+     */
     private fun appendClause(lane: Lane, text: String) {
         val t = text.trim()
         if (t.isBlank()) return
         val cur = lane.para.toString()
         when {
             cur.isEmpty() -> lane.para.append(t)
+            t == cur -> { }
             t.startsWith(cur) -> {
                 lane.para.clear()
                 lane.para.append(t)
             }
-            cur.endsWith(t) -> { }
-            cur.contains(t) && t.length < cur.length / 2 -> { }
+            cur.startsWith(t) || cur.endsWith(t) -> { }
             else -> {
                 val last = cur.last()
-                if (last !in "。？！、，,.!?;； ") lane.para.append(" ")
+                val next = t.first()
+                val asciiRun = last.isLetterOrDigit() && last.code < 128 &&
+                    next.isLetterOrDigit() && next.code < 128
+                if (asciiRun || last !in "。？！、，,.!?;； ") lane.para.append(" ")
                 lane.para.append(t)
             }
         }
         if (lane.para.length > 2000) lane.para.delete(0, lane.para.length - 1800)
     }
 
-    private fun shownText(lane: Lane): String {
-        val body = lane.para.toString()
-        val live = lane.live.trim()
-        return when {
-            live.isBlank() -> body
-            body.isBlank() -> live
-            live.startsWith(body) -> live
-            body.endsWith(live) -> body
-            else -> "$body $live".trim()
-        }
-    }
-
     private fun flushLane(lane: Lane) {
-        val t = shownText(lane).trim()
+        val t = lane.para.toString().trim()
         if (t.isNotBlank()) {
             memory.add(lane.who, t)
             onLog(memory.snapshot())
             onTurn(lane.who, t)
         }
         lane.para.clear()
-        lane.live = ""
     }
 
     private val noMicWatch = Runnable {
@@ -348,6 +344,7 @@ class PhoneListen(
         private const val TAG = "PhoneListen"
         private const val GATE_YOU = 350.0
         private const val GATE_THEM = 200.0
+        private const val ROLE_SEPARATION = 2
         private const val GATE_HANG_MS = 600L
         private const val SUGGEST_DEBOUNCE_MS = 280L
         private const val ENROLL_BYTES = 16000 * 2 * 12

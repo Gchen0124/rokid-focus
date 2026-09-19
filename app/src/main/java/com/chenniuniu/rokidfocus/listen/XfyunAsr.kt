@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class XfyunAsr(
     private val featureIds: String = "",
+    private val roleType: Int = 0,
     private val onText: (text: String, definite: Boolean, speaker: Int) -> Unit,
     private val onFail: (String) -> Unit,
     private val onReady: () -> Unit = {},
@@ -48,10 +49,13 @@ class XfyunAsr(
             "audio_encode" to "pcm_s16le",
             "lang" to if (triedMinor) "autodialect" else "autominor",
             "samplerate" to "16000",
-            "role_type" to "2",
             "eng_vad_mdn" to "1",
         )
-        if (featureIds.isNotBlank()) {
+        // Blind role separation holds intermediate results back until it can name
+        // the speaker, which kills word-by-word captions. We label by mic source
+        // instead, so only turn it on when the caller asks for it.
+        if (roleType != 0) extra["role_type"] = roleType.toString()
+        if (roleType == 2 && featureIds.isNotBlank()) {
             extra["feature_ids"] = featureIds
             extra["eng_spk_match"] = "1"
         }
@@ -213,8 +217,14 @@ class XfyunAsr(
         val definite = type == "0"
         val (text, rl) = readWords(st)
         if (text.isNotBlank()) {
-            Log.i(TAG, "asr def=$definite rl=$rl $text")
+            Log.i(
+                TAG,
+                "asr type=$type seg=${payload.optString("seg_id")} ls=${payload.optString("ls")} " +
+                    "rl=$rl n=${text.length} $text",
+            )
             onText(text, definite, rl)
+        } else {
+            Log.i(TAG, "asr type=$type empty seg=${payload.optString("seg_id")}")
         }
     }
 
