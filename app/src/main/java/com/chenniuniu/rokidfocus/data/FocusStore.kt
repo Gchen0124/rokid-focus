@@ -30,6 +30,8 @@ class FocusStore(context: Context) {
             agentUrl = prefs.getString(KEY_AGENT_URL, "").orEmpty(),
             agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes") ?: "hermes",
             agentKeySet = agentKeyFromPrefs().isNotBlank(),
+            ttsBackend = prefs.getString(KEY_TTS_BACKEND, "system") ?: "system",
+            ttsVoice = prefs.getString(KEY_TTS_VOICE, "xiaoyan") ?: "xiaoyan",
         )
     )
     val state: StateFlow<FocusState> = _state.asStateFlow()
@@ -296,6 +298,18 @@ class FocusStore(context: Context) {
         _state.update { it.copy(speakLine = line) }
     }
 
+    fun setTtsBackend(value: String) {
+        val clean = if (value == "xfyun") "xfyun" else "system"
+        prefs.edit().putString(KEY_TTS_BACKEND, clean).apply()
+        _state.update { it.copy(ttsBackend = clean) }
+    }
+
+    fun setTtsVoice(value: String) {
+        val clean = value.trim().ifBlank { "xiaoyan" }
+        prefs.edit().putString(KEY_TTS_VOICE, clean).apply()
+        _state.update { it.copy(ttsVoice = clean) }
+    }
+
     companion object {
         private const val PREFS = "rokid_focus"
         private const val KEY_PRIORITY = "priority"
@@ -314,6 +328,8 @@ class FocusStore(context: Context) {
         private const val KEY_AGENT_URL = "agent_url"
         private const val KEY_AGENT_KEY = "agent_key"
         private const val KEY_AGENT_MODEL = "agent_model"
+        private const val KEY_TTS_BACKEND = "tts_backend"
+        private const val KEY_TTS_VOICE = "tts_voice"
         const val DEFAULT_SYNC = "http://192.168.1.24:8787"
         const val DEFAULT_SLOGAN = "怪奇实验室 + 外交官"
         const val DEFAULT_TALK = "怪奇实验室 + 外交官"

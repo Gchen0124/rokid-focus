@@ -15,6 +15,7 @@ import com.chenniuniu.rokidfocus.data.FocusState
 import com.chenniuniu.rokidfocus.listen.Lang
 import com.chenniuniu.rokidfocus.sound.ChimePlayer
 import com.chenniuniu.rokidfocus.speak.TtsSpeaker
+import com.chenniuniu.rokidfocus.speak.XfyunTts
 import com.chenniuniu.rokidfocus.data.TaskSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -246,20 +247,38 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     // ---- Speak for me (嘴替) ---------------------------------------------
 
     private val speaker by lazy { TtsSpeaker(app) }
+    private var xfyunTts: XfyunTts? = null
+
+    private fun cloudTts(): XfyunTts = xfyunTts ?: XfyunTts(
+        appId = BuildConfig.XFYUN_APP_ID,
+        apiKey = BuildConfig.XFYUN_API_KEY,
+        apiSecret = BuildConfig.XFYUN_API_SECRET,
+        onLine = { line -> app.store.setSpeakLine(line) },
+    ).also { xfyunTts = it }
 
     /** Speaks [text] aloud through the phone / Bluetooth media route. */
     fun speak(text: String) {
         val t = text.trim()
         if (t.isBlank() || t.equals("skip", true)) return
         val lang = Lang.detect(t)
-        speaker.speak(t, lang)
-        app.store.setSpeakLine("speaking · $lang")
+        if (app.store.snapshot().ttsBackend == "xfyun") {
+            cloudTts().speak(t, app.store.snapshot().ttsVoice, lang)
+            app.store.setSpeakLine("xfyun tts · $lang")
+        } else {
+            speaker.speak(t, lang)
+            app.store.setSpeakLine("speaking · $lang")
+        }
     }
 
     fun stopSpeak() {
         speaker.stop()
+        xfyunTts?.stop()
         app.store.setSpeakLine("")
     }
+
+    fun setTtsBackend(value: String) = app.store.setTtsBackend(value)
+
+    fun setTtsVoice(value: String) = app.store.setTtsVoice(value)
 
     private fun buildClient(snap: FocusState): AgentClient {
         val key = app.store.agentKey()
@@ -272,6 +291,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         agentClient?.cancel()
+        xfyunTts?.stop()
         speaker.shutdown()
         previewPlayer.release()
         super.onCleared()

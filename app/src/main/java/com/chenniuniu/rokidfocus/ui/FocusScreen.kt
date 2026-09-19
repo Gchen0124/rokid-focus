@@ -240,6 +240,35 @@ fun FocusScreen(
             Text(state.enrollLine, style = MaterialTheme.typography.bodySmall)
         }
 
+        Text("Speak for me (嘴替)", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            FilterChip(
+                selected = state.ttsBackend == "system",
+                onClick = { viewModel.setTtsBackend("system") },
+                label = { Text("Phone TTS") },
+            )
+            FilterChip(
+                selected = state.ttsBackend == "xfyun",
+                onClick = { viewModel.setTtsBackend("xfyun") },
+                label = { Text("讯飞 TTS") },
+            )
+            TextButton(onClick = { viewModel.stopSpeak() }) { Text("Stop") }
+        }
+        if (state.ttsBackend == "xfyun") {
+            OutlinedTextField(
+                value = state.ttsVoice,
+                onValueChange = { viewModel.setTtsVoice(it) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Voice (vcn)") },
+                placeholder = { Text("xiaoyan") },
+                singleLine = true,
+            )
+        }
+        Text(
+            "Tap a say-option in Convo (or Speak on an agent reply) to play it through the phone / Bluetooth speaker.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+
         Text("Mother tongue", style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(

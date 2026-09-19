@@ -43,4 +43,6 @@ data class FocusState(
     val agentKeySet: Boolean = false,
     val agentLine: String = "",
     val speakLine: String = "",
+    val ttsBackend: String = "system",
+    val ttsVoice: String = "xiaoyan",
 )
