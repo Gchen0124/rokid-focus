@@ -33,6 +33,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<FocusState> = app.store.state
 
     init {
+        app.speak = { speak(it) }
         viewModelScope.launch {
             while (isActive) {
                 val now = WallClock.now()

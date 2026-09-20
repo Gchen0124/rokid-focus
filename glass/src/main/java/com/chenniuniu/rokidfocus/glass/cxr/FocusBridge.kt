@@ -143,6 +143,10 @@ class FocusBridge(private val store: GlassStore) {
         send("still_on_this")
     }
 
+    fun sendReactPick(index: Int) {
+        send("react_pick", index.toString())
+    }
+
     fun sendListen(on: Boolean) {
         send(if (on) "listen_on" else "listen_off")
     }

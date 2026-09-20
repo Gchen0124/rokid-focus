@@ -8,7 +8,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -142,6 +144,75 @@ class MainActivity : ComponentActivity() {
         convo?.stop()
         convo = null
         convo = ConvoListen(this, app().store, app().bridge).also { it.start(notifyPhone = !fromPhone) }
+    }
+
+    // ---- Ring / external HID controller -----------------------------------
+    // Most rings are BLE HID mice: scroll wheel = AXIS_VSCROLL, buttons =
+    // BUTTON_PRIMARY/SECONDARY or Enter/Dpad. While say-options are up they
+    // choose A/B/C; a click confirms and asks the phone to speak it.
+
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        val device = event.device
+        val mouseLike = event.isFromSource(InputDevice.SOURCE_MOUSE) ||
+            event.isFromSource(InputDevice.SOURCE_TRACKBALL) ||
+            event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER) ||
+            device?.name?.contains("ring", ignoreCase = true) == true
+        if (mouseLike) {
+            val scroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            if (scroll != 0f) {
+                cyclePick(if (scroll > 0f) 1 else -1)
+                return true
+            }
+            val buttons = event.buttonState
+            if (buttons and MotionEvent.BUTTON_PRIMARY != 0) {
+                pickConfirm()
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.repeatCount == 0) Log.i(TAG, "key ${event.keyCode} act=${event.action} from=${event.device?.name}")
+        if (event.action == KeyEvent.ACTION_DOWN && ringSelecting()) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_F13,
+                KeyEvent.KEYCODE_BUTTON_A -> {
+                    pickConfirm()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_F14 -> {
+                    cyclePick(-1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    cyclePick(1)
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun ringSelecting(): Boolean {
+        val s = app().store.snapshot()
+        return s.convoActive && s.convoDrafts.size >= 2
+    }
+
+    private fun cyclePick(delta: Int) {
+        val s = app().store.snapshot()
+        val n = s.convoDrafts.size
+        if (n <= 0) return
+        val next = ((s.convoPick + delta) % n + n) % n
+        app().store.update { it.copy(convoPick = next) }
+    }
+
+    private fun pickConfirm() {
+        val s = app().store.snapshot()
+        if (s.convoDrafts.isEmpty()) return
+        app().bridge.sendReactPick(s.convoPick)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

@@ -21,6 +21,9 @@ class FocusApplication : Application() {
     lateinit var convo: ConvoMemory
         private set
 
+    /** Set by the ViewModel so other components (e.g. a glasses ring) can speak. */
+    var speak: ((String) -> Unit)? = null
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -46,6 +49,10 @@ class FocusApplication : Application() {
             },
             onListen = { live ->
                 store.update { it.copy(listenLive = live) }
+            },
+            onReactPick = { index ->
+                val replies = store.snapshot().convoTurns.lastOrNull { it.replies.isNotEmpty() }?.replies.orEmpty()
+                replies.getOrNull(index)?.let { speak?.invoke(it) }
             },
         )
     }
