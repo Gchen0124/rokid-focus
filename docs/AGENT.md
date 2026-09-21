@@ -27,6 +27,44 @@ design draft · 2026-09-19 · 对齐用
 
 参考实现（B 路线的协议与部署）：`github.com/xingdongcai/rokid-hermes-bridge`、`github.com/h4dex/rokid-hermes-bridge`。
 
+### 1.1 连接你自己的 Hermes（A 路线，实测口径）
+
+> Slack 里的 bot ≠ API server。两者是同一个 gateway 的不同 adapter；**API server 默认关闭**，手机连的是它。
+
+Hermes 侧的接口（来自官方 `hermes-agent` 文档）：
+- 端口 `8642`，路径 `POST /v1/chat/completions`（OpenAI 兼容）、`GET /v1/models`、`GET /health`
+- 鉴权：`Authorization: Bearer <API_SERVER_KEY>`
+- 模型名：默认 profile 名，或 env `API_SERVER_MODEL_NAME`；默认 `hermes-agent`
+- 流式：SSE `chat.completion.chunk`（`choices[0].delta.content`），会夹杂 `: keepalive` 注释行和 `event: hermes.tool.progress` 自定义事件（客户端要跳过非 `data:` / 非 choices 的行）
+- 图片输入：`content` 数组里的 `{"type":"image_url","image_url":{"url":...}}`，支持 http(s) 和 `data:image/...`
+
+**Hermes 侧要做的（一次）** —— 在 `~/.hermes/.env`：
+```
+API_SERVER_ENABLED=true
+API_SERVER_KEY=<>=16 位随机串, openssl rand -hex 32>
+API_SERVER_HOST=0.0.0.0        # 只在需要局域网直连时；默认 127.0.0.1
+API_SERVER_PORT=8642
+# API_SERVER_MODEL_NAME=hermes-agent
+```
+然后 `hermes gateway`（重启），本地自测：
+```bash
+curl -s http://127.0.0.1:8642/health
+curl -s http://127.0.0.1:8642/v1/models -H "Authorization: Bearer $API_SERVER_KEY"
+```
+
+**手机能访问的三种方式**（任选其一）：
+1. **同 Wi-Fi 直连**：`API_SERVER_HOST=0.0.0.0`，用运行 Hermes 那台机器的局域网 IP，如 `http://192.168.1.24:8642`。（安全组/防火墙放行 8642，仅内网）
+2. **SSH 隧道**：`ssh -N -L 8642:127.0.0.1:8642 user@host`，手机用隧道另一端的地址（需手机侧有隧道，通常不如 1 方便）。
+3. **公网 HTTPS**：Cloudflare Tunnel / nginx 反代 8642，手机填 `https://<域名>`。
+
+**App 侧（已完成）**：Agent tab → Backend `Hermes` → 填 gateway URL（如 `http://192.168.1.24:8642`）、API key、model（`hermes-agent`）→ 点 **Test**（打 `/v1/models`）确认，再发消息。
+
+**App 侧还差（P5）**：
+- 「带上最近这段 convo」按钮（把 `memory` 里的对话作为上下文发给 agent）
+- 「用眼镜拍一张」：CXR 拍照 → base64 `data:image/...` → Hermes 视觉
+- 眼镜端流式显示已接（`agent_stream`），图片仍只在手机
+- 灵珠（B 路线）client 未实现（只有 A）
+
 ### 两种事件格式（差异点）
 - **A（OpenAI 兼容 SSE）**：`data: {"choices":[{"delta":{"content":"…"}}]}`，逐 delta 拼接，`data: [DONE]` 结束。
 - **B（灵珠 SSE）**：必须 `event:message` 开头，`data:{"role":"agent","type":"answer","answer_stream":"…","message_id":"…","agent_id":"…","is_finish":false}`，`follow_up?:string[]` 可选。请求带 `message_id`/`agent_id`/`metadata`，响应须原样回传这两个 id。

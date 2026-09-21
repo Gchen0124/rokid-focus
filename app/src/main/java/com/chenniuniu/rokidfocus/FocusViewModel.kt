@@ -245,6 +245,33 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     fun setAgentKey(value: String) = app.store.setAgentKey(value)
     fun setAgentModel(value: String) = app.store.setAgentModel(value)
 
+    /** Hits `GET /v1/models` with the saved key so the URL/key can be checked first. */
+    fun testAgent() {
+        val snap = app.store.snapshot()
+        val url = snap.agentUrl.trim().trimEnd('/')
+        if (url.isBlank()) {
+            app.store.setAgentLine("set the gateway URL first")
+            return
+        }
+        val key = app.store.agentKey()
+        app.store.setAgentLine("testing $url …")
+        viewModelScope.launch {
+            val line = withContext(Dispatchers.IO) {
+                runCatching {
+                    val conn = java.net.URL("$url/v1/models").openConnection() as java.net.HttpURLConnection
+                    conn.setRequestProperty("Authorization", "Bearer $key")
+                    conn.connectTimeout = 6000
+                    conn.readTimeout = 8000
+                    val code = conn.responseCode
+                    val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                        ?.bufferedReader()?.readText().orEmpty()
+                    if (code in 200..299) "ok · ${body.take(200)}" else "http $code · ${body.take(120)}"
+                }.getOrElse { "fail: ${it.message}" }
+            }
+            app.store.setAgentLine(line)
+        }
+    }
+
     // ---- Speak for me (嘴替) ---------------------------------------------
 
     private val speaker by lazy { TtsSpeaker(app) }

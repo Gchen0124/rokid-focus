@@ -162,6 +162,7 @@ private fun AgentConfig(viewModel: FocusViewModel) {
                     label = { Text("Hermes") },
                 )
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = { viewModel.testAgent() }) { Text("Test") }
                 TextButton(onClick = { viewModel.clearAgent() }) { Text("Clear") }
             }
             OutlinedTextField(

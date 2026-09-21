@@ -108,7 +108,7 @@ class HermesDirectClient(
         }
         messages.put(JSONObject().put("role", "user").put("content", content))
         val payload = JSONObject()
-            .put("model", model.ifBlank { "hermes" })
+            .put("model", model.ifBlank { "hermes-agent" })
             .put("stream", true)
             .put("messages", messages)
 

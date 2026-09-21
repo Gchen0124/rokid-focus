@@ -28,7 +28,7 @@ class FocusStore(context: Context) {
             agentMessages = com.chenniuniu.rokidfocus.agent.AgentMessage.fromJson(prefs.getString(KEY_AGENT_MSGS, null)),
             agentBackend = prefs.getString(KEY_AGENT_BACKEND, "mock") ?: "mock",
             agentUrl = prefs.getString(KEY_AGENT_URL, "").orEmpty(),
-            agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes") ?: "hermes",
+            agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes-agent") ?: "hermes-agent",
             agentKeySet = agentKeyFromPrefs().isNotBlank(),
             ttsBackend = prefs.getString(KEY_TTS_BACKEND, "system") ?: "system",
             ttsVoice = prefs.getString(KEY_TTS_VOICE, "xiaoyan") ?: "xiaoyan",
@@ -270,7 +270,7 @@ class FocusStore(context: Context) {
     }
 
     fun setAgentModel(value: String) {
-        val clean = value.trim().ifBlank { "hermes" }
+        val clean = value.trim().ifBlank { "hermes-agent" }
         prefs.edit().putString(KEY_AGENT_MODEL, clean).apply()
         _state.update { it.copy(agentModel = clean) }
     }

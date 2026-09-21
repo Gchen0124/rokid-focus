@@ -39,7 +39,7 @@ data class FocusState(
     val agentBusy: Boolean = false,
     val agentBackend: String = "mock",
     val agentUrl: String = "",
-    val agentModel: String = "hermes",
+    val agentModel: String = "hermes-agent",
     val agentKeySet: Boolean = false,
     val agentLine: String = "",
     val speakLine: String = "",
