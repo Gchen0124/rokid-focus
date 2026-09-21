@@ -52,10 +52,13 @@ curl -s http://127.0.0.1:8642/health
 curl -s http://127.0.0.1:8642/v1/models -H "Authorization: Bearer $API_SERVER_KEY"
 ```
 
-**手机能访问的三种方式**（任选其一）：
-1. **同 Wi-Fi 直连**：`API_SERVER_HOST=0.0.0.0`，用运行 Hermes 那台机器的局域网 IP，如 `http://192.168.1.24:8642`。（安全组/防火墙放行 8642，仅内网）
-2. **SSH 隧道**：`ssh -N -L 8642:127.0.0.1:8642 user@host`，手机用隧道另一端的地址（需手机侧有隧道，通常不如 1 方便）。
-3. **公网 HTTPS**：Cloudflare Tunnel / nginx 反代 8642，手机填 `https://<域名>`。
+**手机能访问的四种方式**（任选其一）：
+1. **Tailscale（推荐，双方已在 tailnet 时最省事）**：Hermes 主机和手机都装 Tailscale 并登录同一 tailnet；`API_SERVER_HOST=0.0.0.0`（让 API server 也监听 tailscale 接口）；手机填 `http://<主机 Tailscale IP 或 MagicDNS 名>:8642`。Tailscale 自带 NAT 穿透，无需公网、无需端口映射。
+2. **同 Wi-Fi 直连**：`API_SERVER_HOST=0.0.0.0`，用运行 Hermes 那台机器的局域网 IP，如 `http://192.168.1.24:8642`。（防火墙放行 8642，仅内网）
+3. **SSH 隧道**：`ssh -N -L 8642:127.0.0.1:8642 user@host`，手机用隧道另一端的地址。
+4. **公网 HTTPS**：Cloudflare Tunnel / nginx 反代 8642，手机填 `https://<域名>`。
+
+> 安全：`API_SERVER_HOST=0.0.0.0` 会把 8642 暴露到所有接口，务必设强 `API_SERVER_KEY`，并用 Tailscale ACL / 防火墙限制来源。
 
 **App 侧（已完成）**：Agent tab → Backend `Hermes` → 填 gateway URL（如 `http://192.168.1.24:8642`）、API key、model（`hermes-agent`）→ 点 **Test**（打 `/v1/models`）确认，再发消息。
 
