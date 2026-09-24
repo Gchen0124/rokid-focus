@@ -117,6 +117,7 @@ fun AgentScreen(
             if (state.agentBusy) {
                 OutlinedButton(onClick = { viewModel.cancelAgent() }) { Text("Stop") }
             } else {
+                OutlinedButton(onClick = { viewModel.askAgentWithConvo() }) { Text("Convo") }
                 Button(
                     onClick = {
                         viewModel.askAgent(input)

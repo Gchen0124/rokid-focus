@@ -34,6 +34,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         app.speak = { speak(it) }
+        app.askAgentNow = { askAgentWithConvo() }
         viewModelScope.launch {
             while (isActive) {
                 val now = WallClock.now()
@@ -185,6 +186,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         app.store.setAgentLive("")
         app.store.setAgentLine("")
         app.store.setAgentBusy(true)
+        app.glasses.agentDelta("…")
 
         val client = buildClient(snap)
         agentClient = client
@@ -224,6 +226,17 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                 app.store.setAgentLine(err)
             },
         )
+    }
+
+    /** Ask the agent using the live conversation as context (glasses gesture / ring). */
+    fun askAgentWithConvo() {
+        val convo = app.convo.prompt().trim()
+        val prompt = if (convo.isBlank()) {
+            "We are in a live conversation. Give me one short, spoken line I could say next."
+        } else {
+            "【live convo】\n$convo\n\nGive me one short, spoken line I should say next."
+        }
+        askAgent(prompt)
     }
 
     fun cancelAgent() {

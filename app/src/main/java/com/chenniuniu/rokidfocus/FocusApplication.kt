@@ -24,6 +24,9 @@ class FocusApplication : Application() {
     /** Set by the ViewModel so other components (e.g. a glasses ring) can speak. */
     var speak: ((String) -> Unit)? = null
 
+    /** Set by the ViewModel: ask the agent using the current conversation. */
+    var askAgentNow: (() -> Unit)? = null
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -54,6 +57,7 @@ class FocusApplication : Application() {
                 val replies = store.snapshot().convoTurns.lastOrNull { it.replies.isNotEmpty() }?.replies.orEmpty()
                 replies.getOrNull(index)?.let { speak?.invoke(it) }
             },
+            onAgentAsk = { askAgentNow?.invoke() },
         )
     }
 

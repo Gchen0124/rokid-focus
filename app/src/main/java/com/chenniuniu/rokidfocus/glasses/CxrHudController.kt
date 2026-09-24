@@ -29,6 +29,7 @@ class CxrHudController(
     private val onStatus: (GlassesStatus, String) -> Unit,
     private val onListen: (Boolean) -> Unit = {},
     private val onReactPick: (Int) -> Unit = {},
+    private val onAgentAsk: () -> Unit = {},
 ) {
     private var link: CXRLink? = null
     private var token: String = ""
@@ -324,6 +325,7 @@ class CxrHudController(
                 "listen_off" -> stopListen(fromGlass = true)
                 "still_on_this" -> { }
                 "react_pick" -> onReactPick(fields.getOrNull(1)?.toIntOrNull() ?: 0)
+                "agent_ask" -> onAgentAsk()
             }
         }
     }

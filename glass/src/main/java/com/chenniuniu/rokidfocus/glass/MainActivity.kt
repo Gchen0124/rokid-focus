@@ -168,6 +168,10 @@ class MainActivity : ComponentActivity() {
                 pickConfirm()
                 return true
             }
+            if (buttons and MotionEvent.BUTTON_SECONDARY != 0) {
+                app().bridge.sendAgentAsk()
+                return true
+            }
         }
         return super.onGenericMotionEvent(event)
     }
