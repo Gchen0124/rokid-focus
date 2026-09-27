@@ -35,6 +35,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     init {
         app.speak = { speak(it) }
         app.askAgentNow = { askAgentWithConvo() }
+        app.agentAskText = { text -> askAgent(text) }
         viewModelScope.launch {
             while (isActive) {
                 val now = WallClock.now()
@@ -226,6 +227,14 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                 app.store.setAgentLine(err)
             },
         )
+    }
+
+    /** Ring press: enter/leave turn-based agent mode (your speech becomes agent questions). */
+    fun toggleAgentMode() {
+        val on = !app.store.snapshot().agentMode
+        app.store.setAgentMode(on)
+        app.glasses.agentMode(on)
+        if (on) runCatching { app.glasses.startListen() }
     }
 
     /** Ask the agent using the live conversation as context (glasses gesture / ring). */

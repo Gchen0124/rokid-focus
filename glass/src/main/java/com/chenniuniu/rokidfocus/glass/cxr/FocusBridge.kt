@@ -126,6 +126,7 @@ class FocusBridge(private val store: GlassStore) {
                     scheduleAgentClear()
                 }
                 "agent_done" -> scheduleAgentClear()
+                "agent_mode" -> setAgentModeLocal(fields.getOrNull(1) == "1")
             }
         }
     }
@@ -180,11 +181,29 @@ class FocusBridge(private val store: GlassStore) {
 
     private fun scheduleAgentClear() {
         agentHide?.let { main.removeCallbacks(it) }
+        if (store.snapshot().agentMode) return
         val hide = Runnable {
-            store.update { it.copy(agentActive = false, agentLine = "", agentImg = false) }
+            if (!store.snapshot().agentMode) {
+                store.update { it.copy(agentActive = false, agentLine = "", agentImg = false) }
+            }
         }
         agentHide = hide
         main.postDelayed(hide, AGENT_HIDE_MS)
+    }
+
+    fun setAgentModeLocal(on: Boolean) {
+        store.update {
+            it.copy(
+                agentMode = on,
+                agentActive = on,
+                agentLine = if (on) "listening · say your question" else "",
+                agentImg = false,
+            )
+        }
+    }
+
+    fun sendAgentMode(on: Boolean) {
+        send("agent_mode", if (on) "1" else "0")
     }
 
     fun clearConvo() {

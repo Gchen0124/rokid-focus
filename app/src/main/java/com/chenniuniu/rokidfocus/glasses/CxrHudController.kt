@@ -30,6 +30,7 @@ class CxrHudController(
     private val onListen: (Boolean) -> Unit = {},
     private val onReactPick: (Int) -> Unit = {},
     private val onAgentAsk: () -> Unit = {},
+    private val onAgentMode: (Boolean) -> Unit = {},
 ) {
     private var link: CXRLink? = null
     private var token: String = ""
@@ -61,7 +62,11 @@ class CxrHudController(
             }
         },
         onLog = { },
-        onTurn = { who, text -> app.store.appendConvo(who, text) },
+        onTurn = { who, text ->
+            app.store.appendConvo(who, text)
+            // Agent mode: the wearer's lines are turned into agent questions.
+            if (who == "you" && app.store.snapshot().agentMode) app.agentAskText?.invoke(text)
+        },
         onLive = { who, text, trans -> app.store.setConvoLive(who, text, trans) },
         onReplies = { replies -> app.store.setLastReplies(replies) },
         onTrans = { trans -> app.store.setLastTrans(trans) },
@@ -214,6 +219,10 @@ class CxrHudController(
         send("agent_done")
     }
 
+    fun agentMode(on: Boolean) {
+        send("agent_mode", if (on) "1" else "0")
+    }
+
     fun beginVoiceEnroll() {
         if (!listen.isOn) startListen()
         app.store.setEnrollLine("speak 12s into the glasses")
@@ -326,6 +335,7 @@ class CxrHudController(
                 "still_on_this" -> { }
                 "react_pick" -> onReactPick(fields.getOrNull(1)?.toIntOrNull() ?: 0)
                 "agent_ask" -> onAgentAsk()
+                "agent_mode" -> onAgentMode(fields.getOrNull(1) == "1")
             }
         }
     }

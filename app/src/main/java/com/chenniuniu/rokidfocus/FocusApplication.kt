@@ -27,6 +27,9 @@ class FocusApplication : Application() {
     /** Set by the ViewModel: ask the agent using the current conversation. */
     var askAgentNow: (() -> Unit)? = null
 
+    /** Set by the ViewModel: send [text] to the agent (agent mode turns). */
+    var agentAskText: ((String) -> Unit)? = null
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -58,6 +61,10 @@ class FocusApplication : Application() {
                 replies.getOrNull(index)?.let { speak?.invoke(it) }
             },
             onAgentAsk = { askAgentNow?.invoke() },
+            onAgentMode = { on ->
+                store.setAgentMode(on)
+                if (on) runCatching { glasses.startListen() }
+            },
         )
     }
 

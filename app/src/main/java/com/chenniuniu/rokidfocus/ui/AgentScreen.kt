@@ -162,6 +162,11 @@ private fun AgentConfig(viewModel: FocusViewModel) {
                     onClick = { viewModel.setAgentBackend("hermes") },
                     label = { Text("Hermes") },
                 )
+                FilterChip(
+                    selected = state.agentMode,
+                    onClick = { viewModel.toggleAgentMode() },
+                    label = { Text("Agent mode") },
+                )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { viewModel.testAgent() }) { Text("Test") }
                 TextButton(onClick = { viewModel.clearAgent() }) { Text("Clear") }

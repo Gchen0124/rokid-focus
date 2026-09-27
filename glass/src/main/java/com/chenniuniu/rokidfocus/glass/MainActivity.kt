@@ -169,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 return true
             }
             if (buttons and MotionEvent.BUTTON_SECONDARY != 0) {
-                app().bridge.sendAgentAsk()
+                toggleAgentMode()
                 return true
             }
         }
@@ -217,6 +217,13 @@ class MainActivity : ComponentActivity() {
         val s = app().store.snapshot()
         if (s.convoDrafts.isEmpty()) return
         app().bridge.sendReactPick(s.convoPick)
+    }
+
+    /** Ring right button: enter/leave turn-based agent mode. */
+    private fun toggleAgentMode() {
+        val on = !app().store.snapshot().agentMode
+        app().bridge.setAgentModeLocal(on)
+        app().bridge.sendAgentMode(on)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

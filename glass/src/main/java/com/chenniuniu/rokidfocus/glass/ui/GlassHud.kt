@@ -165,7 +165,7 @@ fun GlassHud(
                     .padding(horizontal = 6.dp, vertical = 4.dp),
             ) {
                 Text(
-                    "AGENT",
+                    if (state.agentMode) "AGENT MODE" else "AGENT",
                     color = Gold,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,

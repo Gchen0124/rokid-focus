@@ -19,6 +19,7 @@ data class GlassState(
     val slogan: String = "怪奇实验室 + 外交官",
     val opportunities: List<Opportunity> = emptyList(),
     val agentActive: Boolean = false,
+    val agentMode: Boolean = false,
     val agentLine: String = "",
     val agentImg: Boolean = false,
     val convoActive: Boolean = false,

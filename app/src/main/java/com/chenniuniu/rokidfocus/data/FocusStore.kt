@@ -30,6 +30,7 @@ class FocusStore(context: Context) {
             agentUrl = prefs.getString(KEY_AGENT_URL, "").orEmpty(),
             agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes-agent") ?: "hermes-agent",
             agentKeySet = agentKeyFromPrefs().isNotBlank(),
+            agentMode = prefs.getBoolean(KEY_AGENT_MODE, false),
             ttsBackend = prefs.getString(KEY_TTS_BACKEND, "system") ?: "system",
             ttsVoice = prefs.getString(KEY_TTS_VOICE, "xiaoyan") ?: "xiaoyan",
         )
@@ -294,6 +295,11 @@ class FocusStore(context: Context) {
         _state.update { it.copy(agentLine = line) }
     }
 
+    fun setAgentMode(on: Boolean) {
+        prefs.edit().putBoolean(KEY_AGENT_MODE, on).apply()
+        _state.update { it.copy(agentMode = on) }
+    }
+
     fun setSpeakLine(line: String) {
         _state.update { it.copy(speakLine = line) }
     }
@@ -328,6 +334,7 @@ class FocusStore(context: Context) {
         private const val KEY_AGENT_URL = "agent_url"
         private const val KEY_AGENT_KEY = "agent_key"
         private const val KEY_AGENT_MODEL = "agent_model"
+        private const val KEY_AGENT_MODE = "agent_mode"
         private const val KEY_TTS_BACKEND = "tts_backend"
         private const val KEY_TTS_VOICE = "tts_voice"
         const val DEFAULT_SYNC = "http://192.168.1.24:8787"
