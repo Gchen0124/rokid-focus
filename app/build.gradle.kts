@@ -25,6 +25,9 @@ android {
         if (f.exists()) props.load(f.inputStream())
         fun esc(k: String) = "\"${props.getProperty(k, "").replace("\"", "\\\"")}\""
         buildConfigField("String", "DEEPSEEK_API_KEY", esc("deepseek.api.key"))
+        buildConfigField("String", "HERMES_URL", esc("hermes.url"))
+        buildConfigField("String", "HERMES_KEY", esc("hermes.key"))
+        buildConfigField("String", "HERMES_MODEL", esc("hermes.model"))
         buildConfigField("String", "XFYUN_APP_ID", esc("xfyun.app.id"))
         buildConfigField("String", "XFYUN_API_KEY", esc("xfyun.api.key"))
         buildConfigField("String", "XFYUN_API_SECRET", esc("xfyun.api.secret"))

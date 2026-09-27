@@ -26,9 +26,9 @@ class FocusStore(context: Context) {
             convoTurns = com.chenniuniu.rokidfocus.listen.ConvoTurn.fromJson(prefs.getString(KEY_CONVO, null)),
             voiceEnrolled = prefs.getString(KEY_VP, "").orEmpty().isNotBlank(),
             agentMessages = com.chenniuniu.rokidfocus.agent.AgentMessage.fromJson(prefs.getString(KEY_AGENT_MSGS, null)),
-            agentBackend = prefs.getString(KEY_AGENT_BACKEND, "mock") ?: "mock",
-            agentUrl = prefs.getString(KEY_AGENT_URL, "").orEmpty(),
-            agentModel = prefs.getString(KEY_AGENT_MODEL, "hermes-agent") ?: "hermes-agent",
+            agentBackend = agentBackendFromPrefs(),
+            agentUrl = agentUrlFromPrefs(),
+            agentModel = agentModelFromPrefs(),
             agentKeySet = agentKeyFromPrefs().isNotBlank(),
             agentMode = prefs.getBoolean(KEY_AGENT_MODE, false),
             ttsBackend = prefs.getString(KEY_TTS_BACKEND, "system") ?: "system",
@@ -250,7 +250,19 @@ class FocusStore(context: Context) {
     fun agentKey(): String = agentKeyFromPrefs()
 
     private fun agentKeyFromPrefs(): String =
-        prefs.getString(KEY_AGENT_KEY, "")?.trim().orEmpty()
+        prefs.getString(KEY_AGENT_KEY, "")?.trim().orEmpty().ifBlank { BuildConfig.HERMES_KEY }
+
+    private fun agentUrlFromPrefs(): String =
+        prefs.getString(KEY_AGENT_URL, "").orEmpty().ifBlank { BuildConfig.HERMES_URL }
+
+    private fun agentModelFromPrefs(): String =
+        prefs.getString(KEY_AGENT_MODEL, "").orEmpty().ifBlank { BuildConfig.HERMES_MODEL }.ifBlank { "hermes-agent" }
+
+    private fun agentBackendFromPrefs(): String {
+        val stored = prefs.getString(KEY_AGENT_BACKEND, "")?.trim().orEmpty()
+        if (stored == "hermes" || stored == "mock") return stored
+        return if (agentKeyFromPrefs().isNotBlank()) "hermes" else "mock"
+    }
 
     fun setAgentKey(value: String) {
         val clean = value.trim()
